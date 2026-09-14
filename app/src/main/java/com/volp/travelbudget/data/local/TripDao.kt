@@ -19,6 +19,9 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE id = :tripId")
     suspend fun findById(tripId: Long): TripEntity?
 
+    @Query("SELECT * FROM trips ORDER BY startDate DESC")
+    suspend fun findAll(): List<TripEntity>
+
     @Insert
     suspend fun insert(trip: TripEntity): Long
 

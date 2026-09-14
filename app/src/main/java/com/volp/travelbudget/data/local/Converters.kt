@@ -3,6 +3,7 @@ package com.volp.travelbudget.data.local
 import androidx.room.TypeConverter
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /**
  * Room이 다루지 못하는 타입을 문자열로 바꿔 준다.
@@ -17,6 +18,12 @@ class Converters {
 
     @TypeConverter
     fun toLocalDate(value: String?): LocalDate? = value?.let(LocalDate::parse)
+
+    @TypeConverter
+    fun fromLocalDateTime(value: LocalDateTime?): String? = value?.toString()
+
+    @TypeConverter
+    fun toLocalDateTime(value: String?): LocalDateTime? = value?.let(LocalDateTime::parse)
 
     @TypeConverter
     fun fromBudgetMap(value: Map<ExpenseCategory, Long>?): String =

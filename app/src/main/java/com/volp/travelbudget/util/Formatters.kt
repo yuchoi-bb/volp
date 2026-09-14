@@ -56,3 +56,7 @@ fun formatBytes(bytes: Long): String = when {
     bytes >= 1024L -> String.format(Locale.KOREA, "%.0fKB", bytes / 1024.0)
     else -> "${bytes}B"
 }
+
+/** "9.14 (월) 14:08" */
+fun formatDateTime(value: java.time.LocalDateTime): String =
+    "${formatDateWithDay(value.toLocalDate())} ${value.format(DateTimeFormatter.ofPattern("HH:mm"))}"

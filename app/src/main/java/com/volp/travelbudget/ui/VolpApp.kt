@@ -19,6 +19,7 @@ import com.volp.travelbudget.data.update.UpdateChecker
 import com.volp.travelbudget.ui.budget.BudgetEditScreen
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.ui.expense.ExpenseEditorScreen
+import com.volp.travelbudget.ui.inbox.InboxScreen
 import com.volp.travelbudget.ui.newtrip.NewTripScreen
 import com.volp.travelbudget.ui.settings.SettingsScreen
 import com.volp.travelbudget.ui.trip.TripDetailScreen
@@ -30,6 +31,7 @@ object Routes {
     const val TRIPS = "trips"
     const val NEW_TRIP = "trips/new"
     const val SETTINGS = "settings"
+    const val INBOX = "inbox"
 
     fun tripDetail(tripId: Long) = "trips/$tripId"
     fun budgetEdit(tripId: Long) = "trips/$tripId/budget"
@@ -41,7 +43,10 @@ object Routes {
 }
 
 @Composable
-fun VolpApp() {
+fun VolpApp(
+    openInbox: Boolean = false,
+    onInboxOpened: () -> Unit = {},
+) {
     val navController = rememberNavController()
 
     val updateViewModel: UpdateViewModel = viewModel(
@@ -54,6 +59,13 @@ fun VolpApp() {
     // 앱을 열 때마다 한 번씩(하루에 몇 번까지만) 새 빌드가 있는지 확인한다.
     LaunchedEffect(Unit) { updateViewModel.check() }
 
+    LaunchedEffect(openInbox) {
+        if (openInbox) {
+            navController.navigate(Routes.INBOX)
+            onInboxOpened()
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -64,6 +76,7 @@ fun VolpApp() {
                     onAddTrip = { navController.navigate(Routes.NEW_TRIP) },
                     onOpenTrip = { navController.navigate(Routes.tripDetail(it)) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                    onOpenInbox = { navController.navigate(Routes.INBOX) },
                 )
             }
 
@@ -119,6 +132,10 @@ fun VolpApp() {
                     tripId = entry.arguments?.getLong("tripId") ?: 0L,
                     onDone = { navController.popBackStack() },
                 )
+            }
+
+            composable(Routes.INBOX) {
+                InboxScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Routes.SETTINGS) {

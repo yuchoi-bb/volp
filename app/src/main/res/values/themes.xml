@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 실제 화면은 Compose가 그린다. 여기서는 창 배경과 시스템 바만 기기 설정에 맞춘다. -->
-    <style name="Theme.Volp" parent="android:Theme.DeviceDefault.DayNight.NoActionBar" />
+    <style name="Theme.Volp" parent="android:Theme.DeviceDefault.Light.NoActionBar" />
 </resources>
