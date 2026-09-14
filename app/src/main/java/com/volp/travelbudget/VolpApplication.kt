@@ -12,6 +12,7 @@ import com.volp.travelbudget.data.capture.CardCaptureHandler
 import com.volp.travelbudget.data.exchange.ExchangeRateRepository
 import com.volp.travelbudget.data.local.VolpDatabase
 import com.volp.travelbudget.data.photos.PhotoStore
+import com.volp.travelbudget.data.receipt.GeminiReceiptReader
 import com.volp.travelbudget.data.repository.BookingRepository
 import com.volp.travelbudget.data.repository.ItineraryRepository
 import com.volp.travelbudget.data.repository.CashRepository
@@ -21,6 +22,7 @@ import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.travel.LocationProvider
 import com.volp.travelbudget.data.travel.PlaceLookup
 import com.volp.travelbudget.data.weather.WeatherRepository
+import com.volp.travelbudget.widget.TodayWidgetProvider
 import com.volp.travelbudget.data.settings.AppSettings
 import com.volp.travelbudget.data.sync.FirestoreSync
 import com.volp.travelbudget.data.sync.SyncEngine
@@ -50,6 +52,7 @@ class VolpApplication : Application() {
             aliasDao = database.merchantAliasDao(),
             syncDao = database.syncDao(),
             exchangeRates = exchangeRates,
+            onExpensesChanged = { TodayWidgetProvider.notifyChanged(this) },
         )
     }
 
@@ -99,6 +102,9 @@ class VolpApplication : Application() {
     val cashRepository: CashRepository by lazy {
         CashRepository(database.cashTopUpDao(), database.syncDao())
     }
+
+    /** 영수증 사진을 읽는다. 키가 없는 빌드에서는 꺼져 있다. */
+    val receiptReader: GeminiReceiptReader by lazy { GeminiReceiptReader(this) }
 
     val placeLookup: PlaceLookup by lazy { PlaceLookup(this) }
 

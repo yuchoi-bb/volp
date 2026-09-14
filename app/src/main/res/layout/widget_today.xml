@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    홈 화면 위젯. 여행 이름 아래에 오늘 쓸 수 있는 돈과 다음 일정 한 줄을 놓는다.
+    글자 셋이 전부라 배경 하나에 세로로 쌓는 것으로 충분하다.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/widget_background">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="13sp"
+        android:textColor="#B0FFFFFF"
+        android:text="@string/app_name" />
+
+    <TextView
+        android:id="@+id/widget_money"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFFFF"
+        android:text="@string/app_name" />
+
+    <TextView
+        android:id="@+id/widget_next"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:textSize="13sp"
+        android:textColor="#D0FFFFFF"
+        android:text="@string/app_name" />
+</LinearLayout>

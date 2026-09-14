@@ -20,6 +20,10 @@ class ItineraryRepository(
     fun observeStops(tripId: Long): Flow<List<ItineraryStop>> =
         dao.observeStops(tripId).map { list -> list.map { it.toDomain() } }
 
+    /** 지금 시점의 일정. 위젯처럼 한 번만 읽으면 되는 곳에 쓴다. */
+    suspend fun stopsOnce(tripId: Long): List<ItineraryStop> =
+        syncDao.stopsOf(tripId).map { it.toDomain() }
+
     suspend fun addStop(
         tripId: Long,
         date: LocalDate,

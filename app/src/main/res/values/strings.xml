@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Volp</string>
+    <string name="widget_description">오늘 쓸 수 있는 돈과 다음 일정</string>
     <string name="share_target_label">Volp에 구매 넣기</string>
     <string name="shortcut_quick_short">빠른 입력</string>
     <string name="shortcut_quick_long">현금 빠른 입력</string>

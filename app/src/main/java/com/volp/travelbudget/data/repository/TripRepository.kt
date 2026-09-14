@@ -56,6 +56,13 @@ class TripRepository(
     private val aliasDao: MerchantAliasDao,
     private val syncDao: SyncDao,
     private val exchangeRates: ExchangeRateRepository,
+    /**
+     * 지출이 바뀌었을 때 불린다.
+     *
+     * 홈 화면 위젯이 스스로 도는 주기는 삼십 분이라, 지출을 넣자마자 숫자가 그대로면 사용자는
+     * 기록이 안 들어갔다고 여긴다. 쓰는 곳이 여기 하나뿐이라 이 자리에서 알린다.
+     */
+    private val onExpensesChanged: () -> Unit = {},
 ) {
 
     fun observeTripsWithSpending(): Flow<List<TripWithSpending>> =
@@ -159,15 +166,20 @@ class TripRepository(
             )
         }
 
-    suspend fun addExpense(expense: Expense): Long = expenseDao.insert(expense.stamped().toEntity())
+    suspend fun addExpense(expense: Expense): Long =
+        expenseDao.insert(expense.stamped().toEntity()).also { onExpensesChanged() }
 
-    suspend fun updateExpense(expense: Expense) = expenseDao.update(expense.stamped().toEntity())
+    suspend fun updateExpense(expense: Expense) {
+        expenseDao.update(expense.stamped().toEntity())
+        onExpensesChanged()
+    }
 
     suspend fun deleteExpense(expenseId: Long) {
         syncDao.expenseUid(expenseId)?.let { uid ->
             syncDao.recordDeletion(DeletionEntity("expense", uid, SyncIds.now()))
         }
         expenseDao.deleteById(expenseId)
+        onExpensesChanged()
     }
 
     // ---- 카드 문자에서 모은 결제 ----

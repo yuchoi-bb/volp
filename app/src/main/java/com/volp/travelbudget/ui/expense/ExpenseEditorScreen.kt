@@ -32,6 +32,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +50,7 @@ import coil.compose.AsyncImage
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.domain.budget.CurrencyRates
+import com.volp.travelbudget.BuildConfig
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.domain.model.PaymentMethod
 import com.volp.travelbudget.ui.common.DateField
@@ -72,12 +74,14 @@ fun ExpenseEditorScreen(
                 photoStore = app.photoStore,
                 exchangeRates = app.exchangeRates,
                 alertNotifier = app.budgetAlertNotifier,
+                receiptReader = app.receiptReader,
                 tripId = tripId,
                 expenseId = expenseId,
             )
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val scan by viewModel.scan.collectAsStateWithLifecycle()
     val receipts by viewModel.receipts.collectAsStateWithLifecycle()
     val queuedReceipts by viewModel.queuedReceipts.collectAsStateWithLifecycle()
 
@@ -240,6 +244,50 @@ fun ExpenseEditorScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("영수증 사진 넣기") }
+
+                // 키가 없는 빌드에서는 이 기능 자체가 없다.
+                if (BuildConfig.HAS_GEMINI_KEY && (queuedReceipts.isNotEmpty() || receipts.isNotEmpty())) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.scanReceipt(
+                                uri = queuedReceipts.firstOrNull() ?: receipts.firstOrNull()?.uri,
+                                filePath = null,
+                            )
+                        },
+                        enabled = !scan.scanning,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (scan.scanning) "영수증 읽는 중" else "영수증에서 금액 읽기")
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "사진 한 장이 읽기 위해 서버로 올라간다. 누를 때만 보낸다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (scan.done) {
+                    Spacer(Modifier.height(10.dp))
+                    val reading = scan.reading
+                    if (reading == null || !reading.isUsable) {
+                        Text(
+                            "영수증에서 금액을 못 찾았다. 직접 넣어 주세요.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        TextButton(onClick = viewModel::dismissReading) { Text("닫기") }
+                    } else {
+                        Text(reading.summary, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = viewModel::applyReading) { Text("이대로 넣기") }
+                            TextButton(onClick = viewModel::dismissReading) { Text("아니요") }
+                        }
+                    }
+                }
             }
 
             Button(

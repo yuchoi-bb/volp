@@ -27,6 +27,10 @@ val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() && file(releaseStoreFi
 val mapsApiKey: String =
     System.getenv("MAPS_API_KEY") ?: keystoreProperties.getProperty("mapsApiKey") ?: ""
 
+// 영수증을 읽는 데 쓰는 키. 없으면 그 기능만 꺼진 채로 빌드된다.
+val geminiApiKey: String =
+    System.getenv("GEMINI_API_KEY") ?: keystoreProperties.getProperty("geminiApiKey") ?: ""
+
 // 기기끼리 기록을 맞추는 Firestore 설정. 저장소에 두지 않으므로 없으면 없는 대로 빌드된다.
 val googleServicesFile = file("google-services.json")
 val hasFirebase = googleServicesFile.exists()
@@ -54,6 +58,8 @@ android {
         manifestPlaceholders["mapsApiKey"] = mapsApiKey
         buildConfigField("boolean", "HAS_MAPS_KEY", mapsApiKey.isNotBlank().toString())
         buildConfigField("boolean", "HAS_FIREBASE", hasFirebase.toString())
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("boolean", "HAS_GEMINI_KEY", geminiApiKey.isNotBlank().toString())
     }
 
     signingConfigs {

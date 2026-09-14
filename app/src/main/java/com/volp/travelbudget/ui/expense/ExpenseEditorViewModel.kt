@@ -10,7 +10,9 @@ import com.volp.travelbudget.data.photos.TripPhoto
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.domain.budget.CurrencyRates
 import com.volp.travelbudget.domain.model.Expense
+import com.volp.travelbudget.data.receipt.GeminiReceiptReader
 import com.volp.travelbudget.domain.model.ExpenseCategory
+import com.volp.travelbudget.domain.receipt.ReceiptReading
 import com.volp.travelbudget.domain.model.PaymentMethod
 import com.volp.travelbudget.domain.summary.TripSummaries
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +54,7 @@ class ExpenseEditorViewModel(
     private val photoStore: PhotoStore,
     private val exchangeRates: ExchangeRateRepository,
     private val alertNotifier: BudgetAlertNotifier,
+    private val receiptReader: GeminiReceiptReader,
     private val tripId: Long,
     private val expenseId: Long,
 ) : ViewModel() {
@@ -67,6 +70,10 @@ class ExpenseEditorViewModel(
         } else {
             MutableStateFlow(emptyList())
         }
+
+    /** 영수증을 읽는 중인지, 그리고 읽어 낸 값. */
+    private val _scan = MutableStateFlow(ReceiptScanState())
+    val scan: StateFlow<ReceiptScanState> = _scan.asStateFlow()
 
     /** 아직 저장 전이라 붙일 곳이 없는 사진. 저장할 때 함께 붙인다. */
     private val _queuedReceipts = MutableStateFlow<List<Uri>>(emptyList())
@@ -146,6 +153,48 @@ class ExpenseEditorViewModel(
         _queuedReceipts.update { list -> list.filterNot { it == uri } }
     }
 
+    /**
+     * 영수증 사진을 읽어 금액과 가맹점을 채운다.
+     *
+     * 사진이 기기 밖으로 나가는 일이라 사용자가 눌렀을 때만 한다. 읽은 값도 바로 넣지 않고
+     * 무엇을 읽었는지 보여 준 뒤 사용자가 넣기를 누르면 채운다.
+     */
+    fun scanReceipt(uri: Uri?, filePath: String?) {
+        if (!receiptReader.isConfigured) return
+
+        viewModelScope.launch {
+            _scan.value = ReceiptScanState(scanning = true)
+            val reading = when {
+                uri != null -> receiptReader.read(uri)
+                filePath != null -> receiptReader.read(java.io.File(filePath))
+                else -> null
+            }
+            _scan.value = ReceiptScanState(scanning = false, reading = reading, done = true)
+        }
+    }
+
+    /** 읽어 낸 값을 입력 칸에 넣는다. 통화가 다르면 그 통화로 넣는다. */
+    fun applyReading() {
+        val reading = _scan.value.reading ?: return
+        if (!reading.isUsable) return
+
+        _state.update { current ->
+            val foreign = reading.currencyCode.isNotBlank() && reading.currencyCode != "KRW"
+            current.copy(
+                amountInput = reading.total.toString(),
+                useLocalCurrency = foreign,
+                currencyCode = if (foreign) reading.currencyCode else current.currencyCode,
+                memo = current.memo.ifBlank { reading.merchant },
+                date = reading.date ?: current.date,
+            )
+        }
+        _scan.value = ReceiptScanState()
+    }
+
+    fun dismissReading() {
+        _scan.value = ReceiptScanState()
+    }
+
     fun save() {
         val current = _state.value
         if (!current.canSave) return
@@ -191,3 +240,12 @@ private fun defaultDateFor(start: LocalDate?, end: LocalDate?): LocalDate {
     if (start == null || end == null) return today
     return if (today.isBefore(start) || today.isAfter(end)) start else today
 }
+
+/** 영수증 읽기가 지금 어디까지 갔는지. */
+data class ReceiptScanState(
+    val scanning: Boolean = false,
+    val reading: ReceiptReading? = null,
+    /** 한 번 읽어 봤는지. 아무것도 못 읽었을 때 그렇게 말해 주려고 둔다. */
+    val done: Boolean = false,
+)
+
