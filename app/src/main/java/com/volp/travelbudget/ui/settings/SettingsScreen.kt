@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,6 +48,7 @@ import com.volp.travelbudget.data.backup.BackupManager
 import com.volp.travelbudget.data.settings.AppSettings
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.volpViewModelFactory
+import com.volp.travelbudget.util.BuildIdentity
 import com.volp.travelbudget.util.formatTimestamp
 
 @Composable
@@ -203,6 +205,46 @@ fun SettingsScreen(
 
             SectionCard("앱 정보") {
                 Text("버전 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    if (BuildConfig.HAS_MAPS_KEY) "지도 키 있음" else "지도 키 없음 · 지도가 뜨지 않는다",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (BuildConfig.HAS_MAPS_KEY) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                )
+
+                val context = LocalContext.current
+                val sha1 = remember { BuildIdentity.signingSha1(context) }
+                if (sha1 != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Text("서명 지문 (SHA-1)", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        sha1,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (BuildIdentity.isDebugSigned(sha1)) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "디버그 키로 서명된 빌드다. 이대로는 릴리스 빌드로 업데이트할 수 없고 " +
+                                "Google 로그인과 지도도 동작하지 않는다.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "지도 키와 Google 로그인 제한을 이 지문으로 걸어야 한다.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = onCheckUpdate, modifier = Modifier.fillMaxWidth()) {
                     Text("업데이트 확인")
