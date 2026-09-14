@@ -1,8 +1,11 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.volp.travelbudget.ui.trip.tabs
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,6 +42,10 @@ import com.volp.travelbudget.domain.cash.TopUpKind
 import com.volp.travelbudget.domain.cash.WalletSummary
 import java.time.LocalDate
 import com.volp.travelbudget.domain.model.Expense
+import com.volp.travelbudget.domain.model.ExpenseCategory
+import com.volp.travelbudget.domain.model.ExpenseFilter
+import com.volp.travelbudget.domain.model.ExpenseFilterResult
+import com.volp.travelbudget.domain.model.PaymentMethod
 import com.volp.travelbudget.domain.summary.CategoryProgress
 import com.volp.travelbudget.domain.summary.TripSummary
 import com.volp.travelbudget.ui.common.BudgetBar
@@ -73,6 +80,8 @@ fun LedgerTab(
     val summary = state.summary ?: return
     var editingSettlement by remember { mutableStateOf(false) }
     var addingTopUp by remember { mutableStateOf(false) }
+    var filter by remember { mutableStateOf(ExpenseFilter()) }
+    val filtered = remember(state.expenses, filter) { ExpenseFilterResult.of(state.expenses, filter) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -118,7 +127,30 @@ fun LedgerTab(
         }
 
         item {
-            Text("지출 내역 ${state.expenses.size}건", style = MaterialTheme.typography.titleMedium)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (filter.isEmpty) {
+                        "지출 내역 ${state.expenses.size}건"
+                    } else {
+                        "찾은 지출 ${filtered.expenses.size}건 · ${formatKrw(filtered.totalKrw)}"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (!filter.isEmpty) {
+                    TextButton(onClick = { filter = ExpenseFilter() }) { Text("조건 지우기") }
+                }
+            }
+        }
+
+        // 지출이 몇 건뿐이면 찾을 것도 없다. 쌓이기 시작할 때부터 보여 준다.
+        if (state.expenses.size >= SEARCH_THRESHOLD) {
+            item {
+                ExpenseSearchBar(filter = filter, onChange = { filter = it })
+            }
         }
 
         if (state.expenses.isEmpty()) {
@@ -129,9 +161,17 @@ fun LedgerTab(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        } else if (filtered.expenses.isEmpty()) {
+            item {
+                Text(
+                    "조건에 맞는 지출이 없다.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
-        items(state.expenses, key = { it.id }) { expense ->
+        items(filtered.expenses, key = { it.id }) { expense ->
             ExpenseRow(
                 expense = expense,
                 onClick = { onEditExpense(expense.id) },
@@ -575,4 +615,54 @@ private fun TopUpDialog(
         },
     )
 }
+
+/**
+ * 지출을 찾는 줄.
+ *
+ * 여행이 길어지면 지출 목록은 훑는 것이 아니라 찾는 것이 된다. 말로 찾는 칸을 위에 두고,
+ * 자주 쓰는 갈래는 눌러서 좁힐 수 있게 아래에 늘어놓는다.
+ */
+@Composable
+private fun ExpenseSearchBar(filter: ExpenseFilter, onChange: (ExpenseFilter) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = filter.query,
+            onValueChange = { onChange(filter.copy(query = it)) },
+            label = { Text("가맹점·메모로 찾기") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PaymentMethod.entries.filter { it != PaymentMethod.UNKNOWN }.forEach { method ->
+                FilterChip(
+                    selected = method in filter.methods,
+                    onClick = { onChange(filter.copy(methods = filter.methods.toggle(method))) },
+                    label = { Text("${method.emoji} ${method.label}") },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ExpenseCategory.entries.forEach { category ->
+                FilterChip(
+                    selected = category in filter.categories,
+                    onClick = {
+                        onChange(filter.copy(categories = filter.categories.toggle(category)))
+                    },
+                    label = { Text("${category.emoji} ${category.label}") },
+                )
+            }
+        }
+    }
+}
+
+/** 눌렀을 때 켜고 끄기. 조건 칩은 늘 이렇게 움직인다. */
+private fun <T> Set<T>.toggle(value: T): Set<T> =
+    if (value in this) this - value else this + value
+
+/** 이만큼 쌓여야 찾는 줄을 보여 준다. */
+private const val SEARCH_THRESHOLD = 8
 

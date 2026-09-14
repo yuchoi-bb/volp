@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat
 import com.volp.travelbudget.MainActivity
 import com.volp.travelbudget.R
 import com.volp.travelbudget.data.local.BudgetAlertDao
+import com.volp.travelbudget.data.local.BookingDao
 import com.volp.travelbudget.data.local.BudgetAlertEntity
 import com.volp.travelbudget.data.local.PurchaseDao
 import com.volp.travelbudget.data.local.SyncDao
@@ -20,12 +21,14 @@ import com.volp.travelbudget.data.local.toDomain
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.settings.AppSettings
 import com.volp.travelbudget.domain.model.Trip
+import com.volp.travelbudget.domain.booking.BookingAlerts
 import com.volp.travelbudget.domain.packing.PackingAdvisor
 import com.volp.travelbudget.domain.prep.PrepReminder
 import com.volp.travelbudget.domain.prep.TripPrepAdvisor
 import com.volp.travelbudget.domain.purchase.Purchases
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /**
  * 하루에 한 번, 출발 전에 짚을 것과 도착할 때가 된 주문을 살핀다.
@@ -37,6 +40,7 @@ class TripReminderNotifier(
     private val context: Context,
     private val trips: TripRepository,
     private val purchaseDao: PurchaseDao,
+    private val bookingDao: BookingDao,
     private val syncDao: SyncDao,
     private val sentDao: BudgetAlertDao,
     private val settings: AppSettings,
@@ -47,6 +51,34 @@ class TripReminderNotifier(
 
         checkArrivals(today)
         checkPreparations(today)
+    }
+
+    /**
+     * 예약 때문에 지금 말해 줄 것이 있는지.
+     *
+     * 하루 한 번으로는 온라인 체크인이 열리는 순간이나 나설 시각을 맞출 수 없어 시간마다 본다.
+     * 같은 알림은 한 번만 보내므로 자주 본다고 자주 울리지는 않는다.
+     */
+    suspend fun checkBookings(now: LocalDateTime = LocalDateTime.now()) {
+        if (!settings.settings.first().prepRemindersEnabled) return
+
+        val today = now.toLocalDate()
+        trips.tripsOnce()
+            .filter { !it.endDate.isBefore(today.minusDays(1)) && !it.startDate.isAfter(today.plusDays(2)) }
+            .forEach { trip ->
+                val bookings = bookingDao.findByTrip(trip.id).map { it.toDomain() }
+                BookingAlerts.evaluate(bookings, now).forEach { alert ->
+                    if (sentDao.countSent(trip.id, alert.key) > 0) return@forEach
+                    notify(
+                        tag = "booking-${alert.bookingId}",
+                        id = alert.key.hashCode(),
+                        title = alert.title,
+                        message = alert.message,
+                        tripId = trip.id,
+                    )
+                    sentDao.markSent(BudgetAlertEntity(trip.id, alert.key, System.currentTimeMillis()))
+                }
+            }
     }
 
     /** 오늘까지 오기로 한 주문 가운데 아직 안 온 것. */

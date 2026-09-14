@@ -6,7 +6,9 @@ import com.volp.travelbudget.data.repository.BookingRepository
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.travel.PlaceLookup
 import com.volp.travelbudget.domain.booking.Booking
+import com.volp.travelbudget.domain.booking.BookingTextParser
 import com.volp.travelbudget.domain.booking.BookingType
+import com.volp.travelbudget.domain.booking.ParsedBooking
 import com.volp.travelbudget.domain.travel.CityCoordinates
 import com.volp.travelbudget.ui.trip.point
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,6 +57,8 @@ class BookingEditorViewModel(
     private val tripId: Long,
     private val bookingId: Long,
     private val defaultDate: LocalDate,
+    /** 공유로 들어온 글. 있으면 읽어 낸 값을 미리 채운다. */
+    private val sharedText: String? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(BookingEditorUiState())
@@ -63,11 +67,15 @@ class BookingEditorViewModel(
     init {
         viewModelScope.launch {
             val existing = if (bookingId > 0L) bookingRepository.find(bookingId) else null
-            _state.value = existing?.toUiState() ?: BookingEditorUiState(
-                loading = false,
-                startDate = defaultDate,
-                endDate = defaultDate,
-            )
+            _state.value = when {
+                existing != null -> existing.toUiState()
+                !sharedText.isNullOrBlank() -> BookingTextParser.parse(sharedText).toUiState(defaultDate)
+                else -> BookingEditorUiState(
+                    loading = false,
+                    startDate = defaultDate,
+                    endDate = defaultDate,
+                )
+            }
         }
     }
 
@@ -195,3 +203,38 @@ private fun Booking.toUiState() = BookingEditorUiState(
     terminal = terminal,
     memo = memo,
 )
+
+/**
+ * 읽어 낸 예약을 편집 화면의 상태로 옮긴다.
+ *
+ * 못 읽은 자리는 기본값으로 두되, 사람이 그 자리를 알아볼 수 있게 원문을 메모에 남긴다.
+ */
+private fun ParsedBooking.toUiState(defaultDate: LocalDate): BookingEditorUiState {
+    val start = startDate ?: defaultDate
+    val end = endDate ?: start
+
+    return BookingEditorUiState(
+        loading = false,
+        isEditing = false,
+        type = if (type == BookingType.OTHER) BookingType.FLIGHT else type,
+        title = title,
+        provider = provider,
+        confirmationCode = confirmationCode,
+        startDate = start,
+        startTime = (startTime ?: LocalTime.of(9, 0)).toString(),
+        endDate = end,
+        endTime = (endTime ?: LocalTime.of(11, 0)).toString(),
+        useEnd = endDate != null || endTime != null,
+        fromName = fromName,
+        fromCode = fromCode,
+        toName = toName,
+        toCode = toCode,
+        address = address,
+        seat = seat,
+        memo = sourceText.take(MEMO_LIMIT),
+    )
+}
+
+/** 메모에 남길 원문 길이. 너무 길면 화면을 다 덮는다. */
+private const val MEMO_LIMIT = 300
+

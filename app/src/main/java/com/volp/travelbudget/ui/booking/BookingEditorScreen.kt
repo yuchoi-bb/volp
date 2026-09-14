@@ -54,9 +54,10 @@ fun BookingEditorScreen(
     bookingId: Long,
     defaultDate: LocalDate,
     onDone: () -> Unit,
+    sharedText: String? = null,
 ) {
     val viewModel: BookingEditorViewModel = viewModel(
-        key = "booking-$tripId-$bookingId",
+        key = "booking-$tripId-$bookingId-${sharedText?.hashCode() ?: 0}",
         factory = volpViewModelFactory { app ->
             BookingEditorViewModel(
                 bookingRepository = app.bookingRepository,
@@ -65,6 +66,7 @@ fun BookingEditorScreen(
                 tripId = tripId,
                 bookingId = bookingId,
                 defaultDate = defaultDate,
+                sharedText = sharedText,
             )
         },
     )

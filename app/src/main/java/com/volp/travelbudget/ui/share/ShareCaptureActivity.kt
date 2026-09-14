@@ -5,11 +5,10 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.volp.travelbudget.ui.purchase.PurchaseEditorScreen
 import com.volp.travelbudget.ui.theme.VolpTheme
 
 /**
- * 다른 앱에서 보낸 글을 구매 기록으로 받는다.
+ * 다른 앱에서 보낸 글을 구매나 예약으로 받는다.
  *
  * 두 갈래로 들어온다. 문자 앱에서 **공유**를 누르면 [Intent.ACTION_SEND]로, 글을 길게 눌러
  * 블록을 잡고 메뉴에서 고르면 [Intent.ACTION_PROCESS_TEXT]로 온다. 어느 쪽이든 글 한 덩어리를
@@ -29,10 +28,7 @@ class ShareCaptureActivity : ComponentActivity() {
 
         setContent {
             VolpTheme {
-                PurchaseEditorScreen(
-                    sharedText = text,
-                    onDone = { finish() },
-                )
+                ShareCaptureScreen(text = text, onClose = { finish() })
             }
         }
     }

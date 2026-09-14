@@ -31,6 +31,8 @@ import com.volp.travelbudget.domain.itinerary.PlanEntry
 import com.volp.travelbudget.domain.today.DepartureAdvice
 import com.volp.travelbudget.domain.today.TodayPlanner
 import com.volp.travelbudget.domain.travel.GeoPoint
+import com.volp.travelbudget.domain.travel.LocalClock
+import com.volp.travelbudget.domain.travel.TravelZones
 import com.volp.travelbudget.ui.common.BudgetBar
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.map.TripMap
@@ -41,9 +43,10 @@ import com.volp.travelbudget.util.formatKrw
 import com.volp.travelbudget.util.formatKrwShort
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-private val clock = DateTimeFormatter.ofPattern("HH:mm")
+private val clockFormat = DateTimeFormatter.ofPattern("HH:mm")
 
 /**
  * 여행 중에 앱을 열면 처음 보이는 화면. 지금 당장 필요한 것만 위에서부터 놓는다.
@@ -73,12 +76,19 @@ fun TodayTab(
             item {
                 RainBanner(
                     minutesAway = alert.minutesAway,
-                    startsAt = alert.startsAt.format(clock),
+                    startsAt = alert.startsAt.format(clockFormat),
                     probability = alert.probability,
                     place = trip.destinationName,
                 )
             }
         }
+
+        // 시차가 있을 때만 보여 준다. 한국과 같은 곳에서 두 시각을 늘어놓아 봐야 눈만 어지럽다.
+        TravelZones.clock(trip.destinationKey, trip.region, ZonedDateTime.now())
+            ?.takeIf { !it.sameAsHome }
+            ?.let { localClock ->
+                item { ClockCard(place = trip.destinationName, clock = localClock) }
+            }
 
         item {
             NextEntryCard(
@@ -125,7 +135,7 @@ fun TodayTab(
                         remaining.forEach { entry ->
                             Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
                                 Text(
-                                    entry.time?.format(clock) ?: "--:--",
+                                    entry.time?.format(clockFormat) ?: "--:--",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -212,7 +222,7 @@ private fun NextEntryCard(
                 Text(
                     buildString {
                         append(formatDateWithDay(next.date))
-                        next.time?.let { append(" ${it.format(clock)}") }
+                        next.time?.let { append(" ${it.format(clockFormat)}") }
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -238,14 +248,14 @@ private fun NextEntryCard(
         Spacer(Modifier.height(10.dp))
         when {
             advice != null && advice.late -> Text(
-                "${advice.leaveBy.format(clock)}에 나섰어야 합니다",
+                "${advice.leaveBy.format(clockFormat)}에 나섰어야 합니다",
                 style = MaterialTheme.typography.bodyMedium,
                 color = BudgetColors.over,
                 fontWeight = FontWeight.SemiBold,
             )
 
             advice != null -> Text(
-                "${advice.leaveBy.format(clock)}에는 나서야 합니다",
+                "${advice.leaveBy.format(clockFormat)}에는 나서야 합니다",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
@@ -349,3 +359,38 @@ private fun directionsUri(from: GeoPoint?, entry: PlanEntry): String {
     val origin = from?.let { "&origin=${it.latitude},${it.longitude}" }.orEmpty()
     return "https://www.google.com/maps/dir/?api=1&destination=$destination$origin&travelmode=transit"
 }
+
+/**
+ * 현지 시각과 한국 시각.
+ *
+ * 항공편 시각이 현지 시각인지 한국 시각인지 헷갈리면 비행기를 놓친다. 두 시각을 나란히 두면
+ * 그 헷갈림이 사라진다.
+ */
+@Composable
+private fun ClockCard(place: String, clock: LocalClock) {
+    SectionCard {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text(place, style = MaterialTheme.typography.labelMedium)
+                Text(
+                    clock.local.toLocalTime().format(clockFormat),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("한국 · ${clock.offsetLabel}", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    clock.home.toLocalTime().format(clockFormat),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+

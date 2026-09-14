@@ -2,6 +2,7 @@ package com.volp.travelbudget
 
 import android.app.Application
 import com.volp.travelbudget.data.alert.BudgetAlertNotifier
+import com.volp.travelbudget.data.alert.BookingAlertWorker
 import com.volp.travelbudget.data.alert.DailyReminderWorker
 import com.volp.travelbudget.data.alert.TripReminderNotifier
 import com.volp.travelbudget.data.alert.RainAlertWorker
@@ -109,6 +110,7 @@ class VolpApplication : Application() {
             context = this,
             trips = repository,
             purchaseDao = database.purchaseDao(),
+            bookingDao = database.bookingDao(),
             syncDao = database.syncDao(),
             sentDao = database.budgetAlertDao(),
             settings = settings,
@@ -125,6 +127,7 @@ class VolpApplication : Application() {
         RainAlertWorker.schedule(this)
         SyncWorker.schedule(this)
         DailyReminderWorker.schedule(this)
+        BookingAlertWorker.schedule(this)
         // 해외 결제 문자에는 원화 환산액이 없어 환율이 곧 금액 정확도다.
         applicationScope.launch { exchangeRates.refreshIfStale() }
         // 다른 기기에서 넣은 기록을 앱을 여는 순간 따라잡는다.
