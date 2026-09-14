@@ -6,7 +6,11 @@ import com.volp.travelbudget.data.capture.CardCaptureHandler
 import com.volp.travelbudget.data.exchange.ExchangeRateRepository
 import com.volp.travelbudget.data.local.VolpDatabase
 import com.volp.travelbudget.data.photos.PhotoStore
+import com.volp.travelbudget.data.repository.ItineraryRepository
 import com.volp.travelbudget.data.repository.TripRepository
+import com.volp.travelbudget.data.travel.LocationProvider
+import com.volp.travelbudget.data.travel.PlaceLookup
+import com.volp.travelbudget.data.weather.WeatherRepository
 import com.volp.travelbudget.data.settings.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +41,16 @@ class VolpApplication : Application() {
     val settings: AppSettings by lazy { AppSettings(this) }
 
     val photoStore: PhotoStore by lazy { PhotoStore(this, database.tripPhotoDao()) }
+
+    val itineraryRepository: ItineraryRepository by lazy {
+        ItineraryRepository(database.itineraryDao())
+    }
+
+    val placeLookup: PlaceLookup by lazy { PlaceLookup(this) }
+
+    val locationProvider: LocationProvider by lazy { LocationProvider(this) }
+
+    val weatherRepository: WeatherRepository by lazy { WeatherRepository() }
 
     val captureHandler: CardCaptureHandler by lazy {
         CardCaptureHandler(this, repository, settings)

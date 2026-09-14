@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -71,6 +72,7 @@ fun TripDetailScreen(
     onEditBudget: () -> Unit,
     onOpenPhotos: () -> Unit,
     onOpenStats: () -> Unit,
+    onOpenPlan: () -> Unit,
     onDeleted: () -> Unit,
 ) {
     val viewModel: TripDetailViewModel = viewModel(
@@ -95,6 +97,9 @@ fun TripDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenPlan) {
+                        Icon(Icons.Default.Map, contentDescription = "일정과 준비물")
+                    }
                     IconButton(onClick = onOpenStats) {
                         Icon(Icons.Default.BarChart, contentDescription = "통계")
                     }

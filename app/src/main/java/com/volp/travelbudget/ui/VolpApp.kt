@@ -22,6 +22,7 @@ import com.volp.travelbudget.ui.expense.ExpenseEditorScreen
 import com.volp.travelbudget.ui.inbox.InboxScreen
 import com.volp.travelbudget.ui.newtrip.NewTripScreen
 import com.volp.travelbudget.ui.photos.TripPhotosScreen
+import com.volp.travelbudget.ui.plan.TripPlanScreen
 import com.volp.travelbudget.ui.settings.SettingsScreen
 import com.volp.travelbudget.ui.stats.TripStatsScreen
 import com.volp.travelbudget.ui.trip.TripDetailScreen
@@ -39,12 +40,14 @@ object Routes {
     fun budgetEdit(tripId: Long) = "trips/$tripId/budget"
     fun photos(tripId: Long) = "trips/$tripId/photos"
     fun stats(tripId: Long) = "trips/$tripId/stats"
+    fun plan(tripId: Long) = "trips/$tripId/plan"
     fun expenseEditor(tripId: Long, expenseId: Long = 0L) = "trips/$tripId/expense?expenseId=$expenseId"
 
     const val TRIP_DETAIL_PATTERN = "trips/{tripId}"
     const val BUDGET_EDIT_PATTERN = "trips/{tripId}/budget"
     const val PHOTOS_PATTERN = "trips/{tripId}/photos"
     const val STATS_PATTERN = "trips/{tripId}/stats"
+    const val PLAN_PATTERN = "trips/{tripId}/plan"
     const val EXPENSE_EDITOR_PATTERN = "trips/{tripId}/expense?expenseId={expenseId}"
 }
 
@@ -111,6 +114,7 @@ fun VolpApp(
                     onEditBudget = { navController.navigate(Routes.budgetEdit(tripId)) },
                     onOpenPhotos = { navController.navigate(Routes.photos(tripId)) },
                     onOpenStats = { navController.navigate(Routes.stats(tripId)) },
+                    onOpenPlan = { navController.navigate(Routes.plan(tripId)) },
                     onDeleted = { navController.popBackStack() },
                 )
             }
@@ -157,6 +161,16 @@ fun VolpApp(
                 arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
             ) { entry ->
                 TripStatsScreen(
+                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Routes.PLAN_PATTERN,
+                arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
+            ) { entry ->
+                TripPlanScreen(
                     tripId = entry.arguments?.getLong("tripId") ?: 0L,
                     onBack = { navController.popBackStack() },
                 )

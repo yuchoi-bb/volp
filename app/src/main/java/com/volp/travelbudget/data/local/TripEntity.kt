@@ -26,6 +26,8 @@ data class TripEntity(
     val plannedBudget: Map<ExpenseCategory, Long>,
     val billedTotalKrw: Long?,
     val settlementFactor: Double,
+    val latitude: Double?,
+    val longitude: Double?,
     val createdAt: Long,
 )
 
@@ -46,6 +48,8 @@ fun TripEntity.toDomain(): Trip = Trip(
     plannedBudget = plannedBudget,
     billedTotalKrw = billedTotalKrw,
     settlementFactor = settlementFactor,
+    latitude = latitude,
+    longitude = longitude,
     createdAt = createdAt,
 )
 
@@ -66,5 +70,7 @@ fun Trip.toEntity(): TripEntity = TripEntity(
     plannedBudget = plannedBudget,
     billedTotalKrw = billedTotalKrw,
     settlementFactor = settlementFactor,
+    latitude = latitude,
+    longitude = longitude,
     createdAt = createdAt,
 )

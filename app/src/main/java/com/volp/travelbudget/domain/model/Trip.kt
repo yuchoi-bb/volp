@@ -28,6 +28,9 @@ data class Trip(
     val billedTotalKrw: Long? = null,
     /** 승인액 대비 실제 청구액 비율. 보정 전에는 1.0. */
     val settlementFactor: Double = 1.0,
+    /** 목적지의 대표 좌표. 날씨 예보와 첫 동선의 기준점이다. */
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     val createdAt: Long = System.currentTimeMillis(),
 ) {
     val nights: Int

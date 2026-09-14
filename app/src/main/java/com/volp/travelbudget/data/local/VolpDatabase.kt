@@ -16,8 +16,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TripPhotoEntity::class,
         ExchangeRateEntity::class,
         MerchantAliasEntity::class,
+        ItineraryStopEntity::class,
+        PackingCheckEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -34,6 +36,8 @@ abstract class VolpDatabase : RoomDatabase() {
     abstract fun exchangeRateDao(): ExchangeRateDao
 
     abstract fun merchantAliasDao(): MerchantAliasDao
+
+    abstract fun itineraryDao(): ItineraryDao
 
     companion object {
         private const val DATABASE_NAME = "volp.db"
@@ -132,6 +136,44 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        /** 일정표와 준비물 체크, 그리고 여행의 대표 좌표를 더한 버전. */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `trips` ADD COLUMN `latitude` REAL")
+                db.execSQL("ALTER TABLE `trips` ADD COLUMN `longitude` REAL")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `itinerary_stops` (
+                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        `tripId` INTEGER NOT NULL,
+                        `date` TEXT NOT NULL,
+                        `sortOrder` INTEGER NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `address` TEXT NOT NULL,
+                        `latitude` REAL,
+                        `longitude` REAL,
+                        `startTime` TEXT,
+                        `memo` TEXT NOT NULL,
+                        FOREIGN KEY(`tripId`) REFERENCES `trips`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_itinerary_stops_tripId` ON `itinerary_stops` (`tripId`)",
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `packing_checks` (
+                        `tripId` INTEGER NOT NULL,
+                        `itemName` TEXT NOT NULL,
+                        `checked` INTEGER NOT NULL,
+                        PRIMARY KEY(`tripId`, `itemName`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -142,7 +184,13 @@ abstract class VolpDatabase : RoomDatabase() {
 
         private fun build(context: Context): VolpDatabase =
             Room.databaseBuilder(context, VolpDatabase::class.java, DATABASE_NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                )
                 .build()
     }
 }

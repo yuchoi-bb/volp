@@ -10,6 +10,10 @@
     <!-- 카드사 결제 문자를 읽어 지출을 자동으로 모은다. -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- 다음 일정까지 얼마나 걸리는지 알려 주는 데만 쓴다. 위치를 어디에도 보내지 않는다. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <!-- 여행 기간에 찍은 기기 사진을 모아 보여 준다. -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission
