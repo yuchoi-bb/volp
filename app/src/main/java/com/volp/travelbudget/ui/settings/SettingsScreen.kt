@@ -119,6 +119,19 @@ fun SettingsScreen(
                     checked = state.captureEnabled,
                     onCheckedChange = viewModel::setCaptureEnabled,
                 )
+                Spacer(Modifier.height(12.dp))
+                ToggleRow(
+                    label = "확실한 결제는 바로 기록",
+                    checked = state.autoAssignEnabled,
+                    onCheckedChange = viewModel::setAutoAssignEnabled,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "결제 시각이 딱 한 여행의 기간 안에 들어가고 항목까지 알 수 있으면 확인 없이 바로 넣는다. " +
+                        "그 밖에는 미확인함에 쌓인다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             SectionCard("백업") {

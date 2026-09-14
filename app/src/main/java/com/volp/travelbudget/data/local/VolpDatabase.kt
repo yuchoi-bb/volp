@@ -15,8 +15,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PendingTransactionEntity::class,
         TripPhotoEntity::class,
         ExchangeRateEntity::class,
+        MerchantAliasEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -31,6 +32,8 @@ abstract class VolpDatabase : RoomDatabase() {
     abstract fun tripPhotoDao(): TripPhotoDao
 
     abstract fun exchangeRateDao(): ExchangeRateDao
+
+    abstract fun merchantAliasDao(): MerchantAliasDao
 
     companion object {
         private const val DATABASE_NAME = "volp.db"
@@ -113,6 +116,22 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        /** 가맹점 별칭 사전을 더한 버전. */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `merchant_aliases` (
+                        `rawKey` TEXT NOT NULL PRIMARY KEY,
+                        `displayName` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -123,7 +142,7 @@ abstract class VolpDatabase : RoomDatabase() {
 
         private fun build(context: Context): VolpDatabase =
             Room.databaseBuilder(context, VolpDatabase::class.java, DATABASE_NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
     }
 }

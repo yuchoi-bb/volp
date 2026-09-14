@@ -29,6 +29,7 @@ class VolpApplication : Application() {
             tripDao = database.tripDao(),
             expenseDao = database.expenseDao(),
             pendingDao = database.pendingTransactionDao(),
+            aliasDao = database.merchantAliasDao(),
             exchangeRates = exchangeRates,
         )
     }

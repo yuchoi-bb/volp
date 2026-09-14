@@ -49,17 +49,24 @@ class CardCaptureHandler(
             ZoneId.systemDefault(),
         )
         val transaction = CardMessageParser.parse(body, receivedAt, sender) ?: return
-        val stored = repository.capture(transaction, source, current.ownerName)
-        if (!stored) return
+        val pendingId = repository.capture(transaction, source, current.ownerName) ?: return
 
         val amount = if (transaction.isOverseas) {
             formatForeign(transaction.amount, transaction.currencyCode)
         } else {
             formatKrw(transaction.amount.toLong())
         }
+
+        // 여행 기간과 항목이 확실하면 확인을 기다리지 않고 바로 넣는다.
+        val assignedTrip = if (current.autoAssignEnabled) repository.tryAutoAssign(pendingId) else null
+
         notify(
             title = "${transaction.issuer.label} $amount",
-            text = "${transaction.merchant} · 어느 여행의 지출인지 정해 주세요",
+            text = if (assignedTrip != null) {
+                "${transaction.merchant} · '${assignedTrip.title}'에 기록했다"
+            } else {
+                "${transaction.merchant} · 어느 여행의 지출인지 정해 주세요"
+            },
         )
     }
 

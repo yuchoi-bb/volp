@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.volp.travelbudget.data.local.PendingTransaction
 import com.volp.travelbudget.data.repository.TripRepository
-import com.volp.travelbudget.domain.classify.RuleBasedMerchantClassifier
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.domain.model.Trip
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,6 +17,8 @@ data class InboxRow(
     val transaction: PendingTransaction,
     val suggestedTripId: Long?,
     val suggestedCategory: ExpenseCategory,
+    /** 별칭 사전을 거친 보기 좋은 가맹점 이름. 사전에 없으면 원래 이름 그대로. */
+    val suggestedName: String,
 )
 
 data class InboxUiState(
@@ -36,11 +37,12 @@ class InboxViewModel(private val repository: TripRepository) : ViewModel() {
         repository.observeTrips(),
     ) { pending, trips ->
         val rows = pending.map { transaction ->
+            val resolved = repository.resolveMerchant(transaction.merchant)
             InboxRow(
                 transaction = transaction,
                 suggestedTripId = suggestTrip(transaction, trips)?.id,
-                suggestedCategory = RuleBasedMerchantClassifier.classify(transaction.merchant)
-                    ?: ExpenseCategory.ETC,
+                suggestedCategory = resolved.category ?: ExpenseCategory.ETC,
+                suggestedName = resolved.displayName,
             )
         }
         InboxUiState(
@@ -50,8 +52,25 @@ class InboxViewModel(private val repository: TripRepository) : ViewModel() {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), InboxUiState())
 
-    fun accept(pendingId: Long, tripId: Long, category: ExpenseCategory) {
-        viewModelScope.launch { repository.acceptPending(pendingId, tripId, category) }
+    /**
+     * 미확인 결제를 여행 지출로 옮긴다.
+     *
+     * @param rememberAlias 켜면 이 가맹점의 이름과 항목을 사전에 남겨 다음부터 자동으로 쓴다.
+     */
+    fun accept(
+        pendingId: Long,
+        tripId: Long,
+        category: ExpenseCategory,
+        displayName: String,
+        rawMerchant: String,
+        rememberAlias: Boolean,
+    ) {
+        viewModelScope.launch {
+            if (rememberAlias) {
+                repository.rememberAlias(rawMerchant, displayName, category)
+            }
+            repository.acceptPending(pendingId, tripId, category, memoOverride = displayName)
+        }
     }
 
     fun ignore(pendingId: Long) {

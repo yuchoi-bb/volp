@@ -9,6 +9,8 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +33,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -128,8 +132,15 @@ fun InboxScreen(onBack: () -> Unit) {
             row = row,
             trips = state.trips,
             onDismiss = { editing = null },
-            onConfirm = { tripId, category ->
-                viewModel.accept(row.transaction.id, tripId, category)
+            onConfirm = { tripId, category, displayName, keepAlias ->
+                viewModel.accept(
+                    pendingId = row.transaction.id,
+                    tripId = tripId,
+                    category = category,
+                    displayName = displayName,
+                    rawMerchant = row.transaction.merchant,
+                    rememberAlias = keepAlias,
+                )
                 editing = null
             },
         )
@@ -230,7 +241,7 @@ private fun PendingCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    transaction.merchant.ifBlank { "가맹점 미상" },
+                    row.suggestedName.ifBlank { "가맹점 미상" },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -287,18 +298,20 @@ private fun AssignDialog(
     row: InboxRow,
     trips: List<Trip>,
     onDismiss: () -> Unit,
-    onConfirm: (Long, ExpenseCategory) -> Unit,
+    onConfirm: (Long, ExpenseCategory, String, Boolean) -> Unit,
 ) {
     var tripId by remember(row.transaction.id) {
         mutableStateOf(row.suggestedTripId ?: trips.firstOrNull()?.id)
     }
     var category by remember(row.transaction.id) { mutableStateOf(row.suggestedCategory) }
+    var displayName by remember(row.transaction.id) { mutableStateOf(row.suggestedName) }
+    var rememberAlias by remember(row.transaction.id) { mutableStateOf(true) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("어느 여행의 지출인가요") },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 if (trips.isEmpty()) {
                     Text("먼저 여행을 만들어야 지출을 옮길 수 있다.")
                 } else {
@@ -317,13 +330,36 @@ private fun AssignDialog(
                         optionLabel = { "${it.emoji} ${it.label}" },
                         onSelect = { category = it },
                     )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = displayName,
+                        onValueChange = { displayName = it },
+                        label = { Text("가맹점 이름") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "문자에 찍힌 이름: ${row.transaction.merchant}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("다음부터 이 가맹점 기억하기", style = MaterialTheme.typography.bodyMedium)
+                        Switch(checked = rememberAlias, onCheckedChange = { rememberAlias = it })
+                    }
                 }
             }
         },
         confirmButton = {
             TextButton(
                 enabled = tripId != null,
-                onClick = { tripId?.let { onConfirm(it, category) } },
+                onClick = { tripId?.let { onConfirm(it, category, displayName.trim(), rememberAlias) } },
             ) { Text("지출로 추가") }
         },
         dismissButton = {

@@ -20,6 +20,8 @@ data class VolpSettings(
     val ownerName: String = "",
     /** 카드 문자·알림에서 결제 내역을 자동으로 모을지. */
     val captureEnabled: Boolean = true,
+    /** 여행 기간과 항목이 확실한 결제는 확인 없이 바로 지출로 넣을지. */
+    val autoAssignEnabled: Boolean = true,
     /** Drive 자동 백업을 켤지. */
     val autoBackupEnabled: Boolean = true,
     /** 마지막으로 백업에 성공한 시각(epoch millis). 0이면 아직 없다. */
@@ -37,6 +39,7 @@ class AppSettings(private val context: Context) {
     private object Keys {
         val ownerName = stringPreferencesKey("owner_name")
         val captureEnabled = booleanPreferencesKey("capture_enabled")
+        val autoAssignEnabled = booleanPreferencesKey("auto_assign_enabled")
         val autoBackupEnabled = booleanPreferencesKey("auto_backup_enabled")
         val lastBackupAt = longPreferencesKey("last_backup_at")
         val driveFolderId = stringPreferencesKey("drive_folder_id")
@@ -48,6 +51,7 @@ class AppSettings(private val context: Context) {
         VolpSettings(
             ownerName = prefs[Keys.ownerName].orEmpty(),
             captureEnabled = prefs[Keys.captureEnabled] ?: true,
+            autoAssignEnabled = prefs[Keys.autoAssignEnabled] ?: true,
             autoBackupEnabled = prefs[Keys.autoBackupEnabled] ?: true,
             lastBackupAt = prefs[Keys.lastBackupAt] ?: 0L,
             driveFolderId = prefs[Keys.driveFolderId],
@@ -59,6 +63,8 @@ class AppSettings(private val context: Context) {
     suspend fun setOwnerName(value: String) = edit { it[Keys.ownerName] = value.trim() }
 
     suspend fun setCaptureEnabled(value: Boolean) = edit { it[Keys.captureEnabled] = value }
+
+    suspend fun setAutoAssignEnabled(value: Boolean) = edit { it[Keys.autoAssignEnabled] = value }
 
     suspend fun setAutoBackupEnabled(value: Boolean) = edit { it[Keys.autoBackupEnabled] = value }
 

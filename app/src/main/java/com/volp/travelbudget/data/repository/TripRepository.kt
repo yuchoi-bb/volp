@@ -4,10 +4,13 @@ import com.volp.travelbudget.data.backup.TripBackup
 import com.volp.travelbudget.data.exchange.ExchangeRateRepository
 import com.volp.travelbudget.data.local.CaptureSource
 import com.volp.travelbudget.data.local.ExpenseDao
+import com.volp.travelbudget.data.local.MerchantAliasDao
+import com.volp.travelbudget.data.local.MerchantAliasEntity
 import com.volp.travelbudget.data.local.PendingStatus
 import com.volp.travelbudget.data.local.PendingTransaction
 import com.volp.travelbudget.data.local.PendingTransactionDao
 import com.volp.travelbudget.data.local.TripDao
+import com.volp.travelbudget.data.local.normalizeMerchantKey
 import com.volp.travelbudget.data.local.toDomain
 import com.volp.travelbudget.data.local.toEntity
 import com.volp.travelbudget.data.local.toPendingEntity
@@ -26,6 +29,12 @@ import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 
 /** 목록 화면에서 쓰는, 여행과 그 여행의 총지출을 묶은 값. */
+/** 별칭 사전과 규칙을 거쳐 정리한 가맹점. 항목을 못 정했으면 [category]가 null이다. */
+data class ResolvedMerchant(
+    val displayName: String,
+    val category: ExpenseCategory?,
+)
+
 data class TripWithSpending(
     val trip: Trip,
     val totalSpent: Long,
@@ -39,6 +48,7 @@ class TripRepository(
     private val tripDao: TripDao,
     private val expenseDao: ExpenseDao,
     private val pendingDao: PendingTransactionDao,
+    private val aliasDao: MerchantAliasDao,
     private val exchangeRates: ExchangeRateRepository,
 ) {
 
@@ -102,15 +112,78 @@ class TripRepository(
      *
      * @return 새로 들어갔으면 true. 같은 결제가 이미 있으면 false.
      */
+    /**
+     * @return 새로 들어간 행의 아이디. 같은 결제가 이미 있으면 null.
+     */
     suspend fun capture(
         transaction: CardTransaction,
         source: CaptureSource,
         ownerName: String,
-    ): Boolean {
-        if (!transaction.isRecordable) return false
+    ): Long? {
+        if (!transaction.isRecordable) return null
         val id = pendingDao.insertIfNew(transaction.toPendingEntity(source, ownerName))
-        return id > 0L
+        return id.takeIf { it > 0L }
     }
+
+    /**
+     * 확실한 결제는 확인을 기다리지 않고 바로 지출로 넣는다.
+     *
+     * 해외에서는 하루에도 여러 건이 들어오는데 매번 손으로 배정하면 앱을 켜는 일이 일이 된다.
+     * 그래서 다음이 모두 맞을 때만 자동으로 넣는다.
+     * - 내 명의 결제일 것
+     * - 결제 시각이 딱 한 여행의 기간 안에 들어갈 것
+     * - 항목을 알 수 있을 것(별칭 사전이나 가맹점 규칙에 걸릴 것)
+     *
+     * @return 자동으로 넣은 여행. 조건이 맞지 않으면 null.
+     */
+    suspend fun tryAutoAssign(pendingId: Long): Trip? {
+        val pending = pendingDao.findById(pendingId)?.toDomain() ?: return null
+        if (pending.foreignHolder) return null
+
+        val date = pending.occurredAt.toLocalDate()
+        val trip = tripDao.findAll()
+            .map { it.toDomain() }
+            .filter { !date.isBefore(it.startDate) && !date.isAfter(it.endDate) }
+            .singleOrNull() ?: return null
+
+        val resolved = resolveMerchant(pending.merchant)
+        if (resolved.category == null) return null
+
+        acceptPending(
+            pendingId = pendingId,
+            tripId = trip.id,
+            category = resolved.category,
+            memoOverride = resolved.displayName,
+        )
+        return trip
+    }
+
+    // ---- 가맹점 별칭 ----
+
+    /** 별칭 사전과 규칙을 차례로 보고 가맹점 이름과 항목을 정리한다. */
+    suspend fun resolveMerchant(merchant: String): ResolvedMerchant {
+        val alias = aliasDao.find(normalizeMerchantKey(merchant))
+        if (alias != null) {
+            return ResolvedMerchant(alias.displayName, ExpenseCategory.fromName(alias.category))
+        }
+        return ResolvedMerchant(merchant, RuleBasedMerchantClassifier.classify(merchant))
+    }
+
+    fun observeAliases(): Flow<List<MerchantAliasEntity>> = aliasDao.observeAll()
+
+    suspend fun rememberAlias(rawMerchant: String, displayName: String, category: ExpenseCategory) {
+        if (rawMerchant.isBlank()) return
+        aliasDao.upsert(
+            MerchantAliasEntity(
+                rawKey = normalizeMerchantKey(rawMerchant),
+                displayName = displayName.ifBlank { rawMerchant },
+                category = category.name,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    suspend fun forgetAlias(rawKey: String) = aliasDao.deleteByKey(rawKey)
 
     /** 결제 시각이 여행 기간 안에 들어가는 여행을 찾는다. */
     suspend fun findTripFor(transaction: PendingTransaction): Trip? {
@@ -120,15 +193,12 @@ class TripRepository(
             .firstOrNull { !date.isBefore(it.startDate) && !date.isAfter(it.endDate) }
     }
 
-    /** 가맹점 이름으로 항목을 추측한다. 모르겠으면 기타로 둔다. */
-    fun guessCategory(transaction: PendingTransaction): ExpenseCategory =
-        RuleBasedMerchantClassifier.classify(transaction.merchant) ?: ExpenseCategory.ETC
-
     /** 미확인 결제를 실제 여행 지출로 옮긴다. */
     suspend fun acceptPending(
         pendingId: Long,
         tripId: Long,
         category: ExpenseCategory,
+        memoOverride: String? = null,
     ): Long? {
         val pending = pendingDao.findById(pendingId)?.toDomain() ?: return null
         val trip = getTrip(tripId) ?: return null
@@ -147,7 +217,7 @@ class TripRepository(
             originalAmount = if (pending.isOverseas) pending.amount * sign else null,
             currencyCode = if (pending.isOverseas) pending.currencyCode else "KRW",
             date = pending.occurredAt.toLocalDate(),
-            memo = pending.merchant,
+            memo = memoOverride?.takeIf { it.isNotBlank() } ?: pending.merchant,
             exchangeRate = if (pending.isOverseas) rate else null,
         )
         val expenseId = expenseDao.insert(expense.toEntity())

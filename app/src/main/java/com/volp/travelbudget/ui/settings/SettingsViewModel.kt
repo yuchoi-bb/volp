@@ -22,6 +22,10 @@ class SettingsViewModel(private val settings: AppSettings) : ViewModel() {
         viewModelScope.launch { settings.setCaptureEnabled(value) }
     }
 
+    fun setAutoAssignEnabled(value: Boolean) {
+        viewModelScope.launch { settings.setAutoAssignEnabled(value) }
+    }
+
     fun setAutoBackupEnabled(value: Boolean) {
         viewModelScope.launch { settings.setAutoBackupEnabled(value) }
     }
