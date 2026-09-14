@@ -8,6 +8,7 @@ import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.domain.budget.CurrencyRates
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.model.ExpenseCategory
+import com.volp.travelbudget.domain.model.PaymentMethod
 import com.volp.travelbudget.domain.model.Trip
 import com.volp.travelbudget.domain.summary.TripSummaries
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,6 +114,8 @@ class QuickExpenseViewModel(
                     date = defaultDateFor(trip),
                     memo = current.memo.trim(),
                     exchangeRate = if (current.useLocalCurrency) current.exchangeRate else null,
+                    // 빠른 입력은 카드 문자가 못 잡는 현금을 넣으려고 만든 화면이다.
+                    method = PaymentMethod.CASH,
                 ),
             )
 

@@ -23,8 +23,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DayNoteEntity::class,
         DeletionEntity::class,
         PurchaseEntity::class,
+        CashTopUpEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -51,6 +52,8 @@ abstract class VolpDatabase : RoomDatabase() {
     abstract fun syncDao(): SyncDao
 
     abstract fun purchaseDao(): PurchaseDao
+
+    abstract fun cashTopUpDao(): CashTopUpDao
 
     companion object {
         private const val DATABASE_NAME = "volp.db"
@@ -314,6 +317,39 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * 현금 지갑을 더한 버전.
+         *
+         * 카드는 문자로 저절로 들어오지만 현금은 쓰는 순간 기록이 없으면 사라진다. 지출마다
+         * 무엇으로 냈는지를 남기고, 환전해 온 돈을 따로 적어 두면 지갑에 남은 현금이 나온다.
+         */
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 예전에 넣은 지출은 무엇으로 냈는지 알 수 없다. 넘겨짚지 않고 미상으로 둔다.
+                db.execSQL("ALTER TABLE `expenses` ADD COLUMN `method` TEXT NOT NULL DEFAULT 'UNKNOWN'")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `cash_top_ups` (
+                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        `uid` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `tripId` INTEGER NOT NULL,
+                        `kind` TEXT NOT NULL,
+                        `currencyCode` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `krwPaid` INTEGER NOT NULL,
+                        `date` TEXT NOT NULL,
+                        `memo` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`tripId`) REFERENCES `trips`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_cash_top_ups_tripId` ON `cash_top_ups` (`tripId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_cash_top_ups_uid` ON `cash_top_ups` (`uid`)")
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -334,6 +370,7 @@ abstract class VolpDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
+                    MIGRATION_10_11,
                 )
                 .build()
     }

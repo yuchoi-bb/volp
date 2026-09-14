@@ -22,6 +22,8 @@ data class Expense(
     val memo: String,
     /** 이 건에 적용한 환율(1 [currencyCode] 당 원). 나중에 실제 청구액으로 보정할 때 쓴다. */
     val exchangeRate: Double? = null,
+    /** 카드로 냈는지 현금으로 냈는지. 현금 지갑 잔액을 세는 데 쓴다. */
+    val method: PaymentMethod = PaymentMethod.UNKNOWN,
     val createdAt: Long = System.currentTimeMillis(),
 ) : Syncable {
     val enteredInForeignCurrency: Boolean

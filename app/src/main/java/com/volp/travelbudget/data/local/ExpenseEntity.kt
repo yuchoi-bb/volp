@@ -7,6 +7,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.model.ExpenseCategory
+import com.volp.travelbudget.domain.model.PaymentMethod
 import java.time.LocalDate
 
 @Entity(
@@ -33,6 +34,7 @@ data class ExpenseEntity(
     val date: LocalDate,
     val memo: String,
     val exchangeRate: Double?,
+    @ColumnInfo(defaultValue = "UNKNOWN") val method: String,
     val createdAt: Long,
 )
 
@@ -48,6 +50,7 @@ fun ExpenseEntity.toDomain(): Expense = Expense(
     date = date,
     memo = memo,
     exchangeRate = exchangeRate,
+    method = PaymentMethod.fromName(method),
     createdAt = createdAt,
 )
 
@@ -63,5 +66,6 @@ fun Expense.toEntity(): ExpenseEntity = ExpenseEntity(
     date = date,
     memo = memo,
     exchangeRate = exchangeRate,
+    method = method.name,
     createdAt = createdAt,
 )

@@ -17,10 +17,12 @@ import com.volp.travelbudget.data.local.toEntity
 import com.volp.travelbudget.data.local.toPendingEntity
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.model.ExpenseCategory
+import com.volp.travelbudget.domain.model.PaymentMethod
 import com.volp.travelbudget.domain.model.Trip
 import com.volp.travelbudget.domain.cardsms.CardTransaction
 import com.volp.travelbudget.domain.cardsms.TransactionKind
 import com.volp.travelbudget.domain.classify.RuleBasedMerchantClassifier
+import com.volp.travelbudget.domain.budget.TripOutcome
 import com.volp.travelbudget.domain.settlement.Settlement
 import com.volp.travelbudget.domain.sync.SyncIds
 import com.volp.travelbudget.domain.summary.TripSummaries
@@ -108,6 +110,26 @@ class TripRepository(
     /** 지금 시점의 지출 목록. 알림 판단처럼 한 번만 읽으면 되는 곳에 쓴다. */
     suspend fun expensesOnce(tripId: Long): List<Expense> =
         expenseDao.findByTrip(tripId).map { it.toDomain() }
+
+    /**
+     * 끝난 여행들의 예측과 실제.
+     *
+     * 다음 여행 예측을 내 씀씀이 쪽으로 당기는 데 쓴다. 아직 안 끝난 여행은 지출이 덜 들어와
+     * 실제보다 적게 보이므로 넣지 않는다.
+     */
+    suspend fun finishedOutcomes(today: LocalDate = LocalDate.now()): List<TripOutcome> =
+        tripDao.findAll()
+            .map { it.toDomain() }
+            .filter { it.endDate.isBefore(today) }
+            .map { trip ->
+                val actual = expenseDao.findByTrip(trip.id)
+                    .map { it.toDomain() }
+                    .groupBy { it.category }
+                    .mapValues { (_, items) -> items.sumOf { it.amountKrw } }
+
+                TripOutcome(endDate = trip.endDate, predicted = trip.predictedBudget, actual = actual)
+            }
+            .filter { it.actual.isNotEmpty() }
 
     suspend fun addExpense(expense: Expense): Long = expenseDao.insert(expense.stamped().toEntity())
 
@@ -240,6 +262,8 @@ class TripRepository(
             date = pending.occurredAt.toLocalDate(),
             memo = memoOverride?.takeIf { it.isNotBlank() } ?: pending.merchant,
             exchangeRate = if (pending.isOverseas) rate else null,
+            // 카드 문자에서 온 건이므로 현금 지갑에서 빠지면 안 된다.
+            method = PaymentMethod.CARD,
         )
         val expenseId = expenseDao.insert(expense.stamped().toEntity())
         pendingDao.updateStatus(pendingId, PendingStatus.ACCEPTED.name, tripId, expenseId)

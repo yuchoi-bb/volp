@@ -54,6 +54,7 @@ class SyncEngine(
                 packing = syncDao.packingChecksOf(entity.id).map {
                     PackingCheck(it.itemName, it.checked, it.updatedAt)
                 },
+                cash = syncDao.cashTopUpsOf(entity.id).map { it.toDomain() },
             )
         }
 
@@ -161,6 +162,20 @@ class SyncEngine(
             pulled++
         }
         stops.removedUids.forEach { syncDao.deleteStopByUid(it) }
+
+        val cash = SyncMerge.merge(
+            local = syncDao.cashTopUpsOf(tripId).map { it.toDomain() },
+            remote = bundle.cash,
+            localTombstones = tombstones.stones("cash"),
+        )
+        cash.incoming.forEach { topUp ->
+            val existing = syncDao.cashTopUpByUid(topUp.uid)
+            syncDao.upsertCashTopUp(
+                topUp.copy(id = existing?.id ?: 0L, tripId = tripId).toEntity(),
+            )
+            pulled++
+        }
+        cash.removedUids.forEach { syncDao.deleteCashTopUpByUid(it) }
 
         mergeNotes(tripId, bundle.notes)
         mergePacking(tripId, bundle.packing)

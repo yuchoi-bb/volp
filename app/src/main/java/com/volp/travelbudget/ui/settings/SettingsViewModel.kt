@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 class SettingsViewModel(private val settings: AppSettings) : ViewModel() {
 
@@ -36,6 +37,15 @@ class SettingsViewModel(private val settings: AppSettings) : ViewModel() {
 
     fun setAutoBackupEnabled(value: Boolean) {
         viewModelScope.launch { settings.setAutoBackupEnabled(value) }
+    }
+
+    fun setPrepRemindersEnabled(value: Boolean) {
+        viewModelScope.launch { settings.setPrepRemindersEnabled(value) }
+    }
+
+    /** 여권 만료일. 비우면 확인하지 않는다. */
+    fun setPassportExpiry(value: LocalDate?) {
+        viewModelScope.launch { settings.setPassportExpiry(value?.toString().orEmpty()) }
     }
 
     private companion object {

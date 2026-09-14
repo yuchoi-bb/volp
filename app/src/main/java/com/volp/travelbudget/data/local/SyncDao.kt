@@ -103,4 +103,19 @@ interface SyncDao {
 
     @Query("SELECT * FROM itinerary_stops WHERE tripId = :tripId")
     suspend fun stopsOf(tripId: Long): List<ItineraryStopEntity>
+
+    @Query("SELECT COUNT(*) FROM bookings WHERE tripId = :tripId")
+    suspend fun bookingCount(tripId: Long): Int
+
+    @Query("SELECT * FROM cash_top_ups WHERE tripId = :tripId")
+    suspend fun cashTopUpsOf(tripId: Long): List<CashTopUpEntity>
+
+    @Query("SELECT * FROM cash_top_ups WHERE uid = :uid")
+    suspend fun cashTopUpByUid(uid: String): CashTopUpEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCashTopUp(entry: CashTopUpEntity)
+
+    @Query("DELETE FROM cash_top_ups WHERE uid = :uid")
+    suspend fun deleteCashTopUpByUid(uid: String)
 }

@@ -2,6 +2,7 @@ package com.volp.travelbudget.data.sync
 
 import com.volp.travelbudget.data.local.DeletionEntity
 import com.volp.travelbudget.domain.booking.Booking
+import com.volp.travelbudget.domain.cash.CashTopUp
 import com.volp.travelbudget.domain.itinerary.ItineraryStop
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.model.Trip
@@ -30,6 +31,7 @@ data class TripBundle(
     val stops: List<ItineraryStop> = emptyList(),
     val notes: List<DayNote> = emptyList(),
     val packing: List<PackingCheck> = emptyList(),
+    val cash: List<CashTopUp> = emptyList(),
 )
 
 /**
@@ -56,7 +58,7 @@ data class SyncSnapshot(
     val deletions: List<DeletionEntity> = emptyList(),
 ) {
     companion object {
-        const val FORMAT_VERSION = 3
+        const val FORMAT_VERSION = 4
         const val FILE_NAME = "volp-backup.json"
         const val CSV_FILE_NAME = "volp-expenses.csv"
     }

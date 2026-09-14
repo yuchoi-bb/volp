@@ -46,10 +46,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.BuildConfig
 import com.volp.travelbudget.data.backup.BackupManager
 import com.volp.travelbudget.data.settings.AppSettings
+import com.volp.travelbudget.ui.common.DateField
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.util.BuildIdentity
 import com.volp.travelbudget.util.formatTimestamp
+import java.time.LocalDate
 
 @Composable
 fun SettingsScreen(
@@ -173,6 +175,47 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+
+            SectionCard("출발 준비") {
+                ToggleRow(
+                    label = "출발 전 준비와 배송 도착 알림",
+                    checked = state.prepRemindersEnabled,
+                    onCheckedChange = viewModel::setPrepRemindersEnabled,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "일주일 전과 하루 전에 한 번씩, 아직 안 챙긴 것과 못 받은 주문을 아침에 알려 준다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(12.dp))
+                val passport = remember(state.passportExpiry) {
+                    runCatching { LocalDate.parse(state.passportExpiry) }.getOrNull()
+                }
+                if (passport == null) {
+                    OutlinedButton(
+                        onClick = { viewModel.setPassportExpiry(LocalDate.now().plusYears(5)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("여권 만료일 넣기") }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "넣어 두면 출발 전에 잔여 유효기간이 모자라지 않은지 확인한다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    DateField(
+                        label = "여권 만료일",
+                        date = passport,
+                        onDateChange = { viewModel.setPassportExpiry(it) },
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = { viewModel.setPassportExpiry(null) }) {
+                        Text("여권 만료일 지우기")
+                    }
+                }
             }
 
             SectionCard("다른 기기와 함께 쓰기") {

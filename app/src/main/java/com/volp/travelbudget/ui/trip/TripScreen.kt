@@ -76,6 +76,7 @@ fun TripScreen(
                 repository = app.repository,
                 itineraryRepository = app.itineraryRepository,
                 bookingRepository = app.bookingRepository,
+                cashRepository = app.cashRepository,
                 photoStore = app.photoStore,
                 placeLookup = app.placeLookup,
                 locationProvider = app.locationProvider,
@@ -152,6 +153,8 @@ fun TripScreen(
                     onEditBudget = onEditBudget,
                     onOpenStats = onOpenStats,
                     onApplySettlement = viewModel::applySettlement,
+                    onAddTopUp = viewModel::addTopUp,
+                    onDeleteTopUp = viewModel::deleteTopUp,
                 )
 
                 else -> RecordTab(

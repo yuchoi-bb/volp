@@ -3,9 +3,12 @@ package com.volp.travelbudget.data.sync
 import com.volp.travelbudget.data.local.DeletionEntity
 import com.volp.travelbudget.domain.booking.Booking
 import com.volp.travelbudget.domain.booking.BookingType
+import com.volp.travelbudget.domain.cash.CashTopUp
+import com.volp.travelbudget.domain.cash.TopUpKind
 import com.volp.travelbudget.domain.itinerary.ItineraryStop
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.model.ExpenseCategory
+import com.volp.travelbudget.domain.model.PaymentMethod
 import com.volp.travelbudget.domain.model.Region
 import com.volp.travelbudget.domain.model.TravelStyle
 import com.volp.travelbudget.domain.model.Trip
@@ -115,6 +118,7 @@ object SyncCodec {
             .put("stops", JSONArray().apply { bundle.stops.forEach { put(stopToJson(it)) } })
             .put("notes", JSONArray().apply { bundle.notes.forEach { put(noteToJson(it)) } })
             .put("packing", JSONArray().apply { bundle.packing.forEach { put(packingToJson(it)) } })
+            .put("cash", JSONArray().apply { bundle.cash.forEach { put(cashToJson(it)) } })
 
     fun tripToJson(trip: Trip): JSONObject {
         return JSONObject()
@@ -150,6 +154,7 @@ object SyncCodec {
             stops = json.optJSONArray("stops").map { stopFromJson(it) },
             notes = json.optJSONArray("notes").map { noteFromJson(it) },
             packing = json.optJSONArray("packing").map { packingFromJson(it) },
+            cash = json.optJSONArray("cash").map { cashFromJson(it) },
         )
     }
 
@@ -190,6 +195,7 @@ object SyncCodec {
         .put("date", expense.date.toString())
         .put("memo", expense.memo)
         .put("exchangeRate", expense.exchangeRate ?: JSONObject.NULL)
+        .put("method", expense.method.name)
         .put("createdAt", expense.createdAt)
 
     fun expenseFromJson(json: JSONObject) = Expense(
@@ -203,6 +209,7 @@ object SyncCodec {
         date = LocalDate.parse(json.getString("date")),
         memo = json.optString("memo"),
         exchangeRate = if (json.isNull("exchangeRate")) null else json.optDouble("exchangeRate"),
+        method = PaymentMethod.fromName(json.optString("method")),
         createdAt = json.optLong("createdAt", System.currentTimeMillis()),
     )
 
@@ -300,6 +307,32 @@ object SyncCodec {
         itemName = json.optString("itemName"),
         checked = json.optBoolean("checked"),
         updatedAt = json.optLong("updatedAt"),
+    )
+
+    // ---- 현금 ----
+
+    fun cashToJson(topUp: CashTopUp) = JSONObject()
+        .put("uid", topUp.uid)
+        .put("updatedAt", topUp.updatedAt)
+        .put("kind", topUp.kind.name)
+        .put("currencyCode", topUp.currencyCode)
+        .put("amount", topUp.amount)
+        .put("krwPaid", topUp.krwPaid)
+        .put("date", topUp.date.toString())
+        .put("memo", topUp.memo)
+        .put("createdAt", topUp.createdAt)
+
+    fun cashFromJson(json: JSONObject) = CashTopUp(
+        uid = json.optString("uid"),
+        updatedAt = json.optLong("updatedAt"),
+        tripId = 0L,
+        kind = TopUpKind.fromName(json.optString("kind")),
+        currencyCode = json.optString("currencyCode", "KRW"),
+        amount = json.optDouble("amount", 0.0),
+        krwPaid = json.optLong("krwPaid"),
+        date = LocalDate.parse(json.getString("date")),
+        memo = json.optString("memo"),
+        createdAt = json.optLong("createdAt", System.currentTimeMillis()),
     )
 
     // ---- 구매 ----

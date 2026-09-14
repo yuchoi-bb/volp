@@ -11,6 +11,7 @@ import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.domain.budget.CurrencyRates
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.model.ExpenseCategory
+import com.volp.travelbudget.domain.model.PaymentMethod
 import com.volp.travelbudget.domain.summary.TripSummaries
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,7 @@ data class ExpenseEditorUiState(
     val currencyCode: String = "KRW",
     val exchangeRate: Double = 1.0,
     val amountInput: String = "",
+    val method: PaymentMethod = PaymentMethod.CARD,
     val saved: Boolean = false,
 ) {
     private val amount: Double get() = amountInput.replace(",", "").toDoubleOrNull() ?: 0.0
@@ -93,6 +95,7 @@ class ExpenseEditorViewModel(
                     } else {
                         existing.amountKrw.toString()
                     },
+                    method = existing.method,
                 )
             } else {
                 ExpenseEditorUiState(
@@ -112,6 +115,8 @@ class ExpenseEditorViewModel(
     fun setDate(value: LocalDate) = _state.update { it.copy(date = value) }
 
     fun setMemo(value: String) = _state.update { it.copy(memo = value) }
+
+    fun setMethod(value: PaymentMethod) = _state.update { it.copy(method = value) }
 
     fun setAmountInput(value: String) = _state.update { it.copy(amountInput = value) }
 
@@ -155,6 +160,7 @@ class ExpenseEditorViewModel(
                 date = current.date,
                 memo = current.memo.trim(),
                 exchangeRate = if (current.useLocalCurrency) current.exchangeRate else null,
+                method = current.method,
             )
             if (current.isEditing) {
                 repository.updateExpense(expense)

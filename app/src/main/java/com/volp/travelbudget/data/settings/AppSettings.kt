@@ -46,6 +46,12 @@ data class VolpSettings(
     val autoSyncEnabled: Boolean = true,
     /** 마지막으로 동기화에 성공한 시각(epoch millis). 이 뒤에 바뀐 것만 주고받는다. */
     val lastSyncAt: Long = 0L,
+    /** 여권 만료일(ISO). 비어 있으면 모른다. */
+    val passportExpiry: String = "",
+    /** 출발 전 준비와 배송 도착을 하루 한 번 짚어 줄지. */
+    val prepRemindersEnabled: Boolean = true,
+    /** 배송 알림을 마지막으로 보낸 날(ISO). 하루에 한 번만 울리게 한다. */
+    val lastArrivalReminderOn: String = "",
 )
 
 class AppSettings(private val context: Context) {
@@ -66,6 +72,9 @@ class AppSettings(private val context: Context) {
         val syncCode = stringPreferencesKey("sync_code")
         val autoSyncEnabled = booleanPreferencesKey("auto_sync_enabled")
         val lastSyncAt = longPreferencesKey("last_sync_at")
+        val passportExpiry = stringPreferencesKey("passport_expiry")
+        val prepRemindersEnabled = booleanPreferencesKey("prep_reminders_enabled")
+        val lastArrivalReminderOn = stringPreferencesKey("last_arrival_reminder_on")
     }
 
     val settings: Flow<VolpSettings> = context.settingsStore.data.map { prefs ->
@@ -85,6 +94,9 @@ class AppSettings(private val context: Context) {
             syncCode = prefs[Keys.syncCode] ?: "",
             autoSyncEnabled = prefs[Keys.autoSyncEnabled] ?: true,
             lastSyncAt = prefs[Keys.lastSyncAt] ?: 0L,
+            passportExpiry = prefs[Keys.passportExpiry] ?: "",
+            prepRemindersEnabled = prefs[Keys.prepRemindersEnabled] ?: true,
+            lastArrivalReminderOn = prefs[Keys.lastArrivalReminderOn] ?: "",
         )
     }
 
@@ -117,6 +129,14 @@ class AppSettings(private val context: Context) {
     suspend fun setAutoSyncEnabled(value: Boolean) = edit { it[Keys.autoSyncEnabled] = value }
 
     suspend fun setLastSyncAt(value: Long) = edit { it[Keys.lastSyncAt] = value }
+
+    suspend fun setPassportExpiry(value: String) = edit { it[Keys.passportExpiry] = value.trim() }
+
+    suspend fun setPrepRemindersEnabled(value: Boolean) =
+        edit { it[Keys.prepRemindersEnabled] = value }
+
+    suspend fun setLastArrivalReminderOn(value: String) =
+        edit { it[Keys.lastArrivalReminderOn] = value }
 
     private suspend fun edit(block: suspend (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.settingsStore.edit(block)

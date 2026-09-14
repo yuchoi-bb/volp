@@ -45,6 +45,7 @@ import com.volp.travelbudget.ui.common.NumberField
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.util.formatKrw
+import kotlin.math.roundToInt
 
 private const val CUSTOM_LABEL = "직접 입력"
 
@@ -221,6 +222,15 @@ fun NewTripScreen(
                     value = formatKrw(state.predictedTotal),
                     valueColor = MaterialTheme.colorScheme.primary,
                 )
+
+                if (!state.profile.isEmpty) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        profileNote(state),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             Button(
@@ -234,3 +244,22 @@ fun NewTripScreen(
         }
     }
 }
+
+/**
+ * 예측을 왜 이렇게 냈는지 한 줄로 말해 준다.
+ *
+ * 숫자만 슬쩍 바뀌면 사용자는 앱이 제멋대로 군다고 느낀다. 무엇을 보고 고쳤는지 밝히는 편이 낫다.
+ */
+private fun profileNote(state: NewTripUiState): String {
+    val notable = state.profile.notableAdjustments()
+    val base = "지난 여행 ${state.profile.tripCount}건을 반영했다"
+
+    if (notable.isEmpty()) return "$base."
+
+    val parts = notable.take(2).joinToString(", ") { (category, factor) ->
+        val percent = kotlin.math.abs((factor - 1.0) * 100).roundToInt()
+        if (factor > 1.0) "${category.label} +${percent}%" else "${category.label} -${percent}%"
+    }
+    return "$base: $parts"
+}
+

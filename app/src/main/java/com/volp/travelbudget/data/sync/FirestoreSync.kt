@@ -237,6 +237,7 @@ object SyncRecords {
     const val STOP = "stop"
     const val NOTE = "note"
     const val PACKING = "packing"
+    const val CASH = "cash"
     const val PURCHASE = "purchase"
 
     fun flatten(snapshot: SyncSnapshot): List<SyncRecord> = buildList {
@@ -282,6 +283,10 @@ object SyncRecords {
                         SyncCodec.packingToJson(it).toString(),
                     ),
                 )
+            }
+
+            bundle.cash.forEach {
+                add(SyncRecord(CASH, it.uid, tripUid, it.updatedAt, SyncCodec.cashToJson(it).toString()))
             }
         }
 
@@ -337,6 +342,7 @@ object SyncRecords {
                 stops = records.of(STOP, trip.uid) { SyncCodec.stopFromJson(it) },
                 notes = records.of(NOTE, trip.uid) { SyncCodec.noteFromJson(it) },
                 packing = records.of(PACKING, trip.uid) { SyncCodec.packingFromJson(it) },
+                cash = records.of(CASH, trip.uid) { SyncCodec.cashFromJson(it) },
             )
         }
 

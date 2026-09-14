@@ -31,6 +31,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
+import com.volp.travelbudget.domain.cash.CashTopUp
+import com.volp.travelbudget.domain.cash.CashWallets
+import com.volp.travelbudget.domain.cash.TopUpKind
+import com.volp.travelbudget.domain.cash.WalletSummary
+import java.time.LocalDate
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.summary.CategoryProgress
 import com.volp.travelbudget.domain.summary.TripSummary
@@ -59,10 +66,13 @@ fun LedgerTab(
     onEditBudget: () -> Unit,
     onOpenStats: () -> Unit,
     onApplySettlement: (Long?) -> Unit,
+    onAddTopUp: (TopUpKind, Double, Long, LocalDate, String) -> Unit,
+    onDeleteTopUp: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val summary = state.summary ?: return
     var editingSettlement by remember { mutableStateOf(false) }
+    var addingTopUp by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -80,6 +90,18 @@ fun LedgerTab(
                     approvedForeign = state.foreignApproved,
                     onEdit = { editingSettlement = true },
                     onClear = { onApplySettlement(null) },
+                )
+            }
+        }
+
+        state.wallet?.let { wallet ->
+            item {
+                WalletCard(
+                    wallet = wallet,
+                    topUps = state.cashTopUps,
+                    remainingDays = summary.remainingDays,
+                    onAdd = { addingTopUp = true },
+                    onDelete = onDeleteTopUp,
                 )
             }
         }
@@ -125,6 +147,18 @@ fun LedgerTab(
         }
 
         item { Spacer(Modifier.height(72.dp)) }
+    }
+
+    if (addingTopUp) {
+        TopUpDialog(
+            currencyCode = state.trip?.currencyCode ?: "KRW",
+            suggestedRate = state.trip?.exchangeRate ?: 1.0,
+            onDismiss = { addingTopUp = false },
+            onAdd = { kind, amount, krw, date, memo ->
+                onAddTopUp(kind, amount, krw, date, memo)
+                addingTopUp = false
+            },
+        )
     }
 
     if (editingSettlement) {
@@ -356,3 +390,189 @@ private fun ExpenseRow(
         }
     }
 }
+
+/**
+ * 지갑에 남은 현금.
+ *
+ * 카드는 문자로 저절로 들어오지만 현금은 쓰는 순간 기록이 없으면 사라진다. 환전한 돈에서 현금
+ * 지출을 뺀 값이 곧 지금 주머니에 있는 돈이고, 여행 중에 제일 자주 궁금한 숫자가 그것이다.
+ */
+@Composable
+private fun WalletCard(
+    wallet: WalletSummary,
+    topUps: List<CashTopUp>,
+    remainingDays: Int,
+    onAdd: () -> Unit,
+    onDelete: (Long) -> Unit,
+) {
+    SectionCard("현금 지갑") {
+        if (wallet.isEmpty) {
+            Text(
+                "환전하거나 인출한 돈을 넣어 두면 지금 주머니에 얼마 남았는지 보인다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
+                Text("환전 넣기")
+            }
+            return@SectionCard
+        }
+
+        Text(
+            formatForeign(wallet.remaining, wallet.currencyCode),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = if (wallet.overspent) BudgetColors.over else MaterialTheme.colorScheme.onSurface,
+        )
+        if (wallet.remainingKrw != 0L) {
+            Text(
+                "약 ${formatKrw(wallet.remainingKrw)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (wallet.overspent) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "환전한 것보다 더 썼다. 넣지 않은 환전이 있는지 확인해 보세요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = BudgetColors.over,
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+        LabeledRow("채운 돈", formatForeign(wallet.toppedUp, wallet.currencyCode))
+        Spacer(Modifier.height(6.dp))
+        LabeledRow("현금으로 쓴 돈", formatForeign(wallet.spent, wallet.currencyCode))
+
+        wallet.effectiveRate?.let { rate ->
+            Spacer(Modifier.height(6.dp))
+            // 고시환율이 아니라 수수료까지 물고 실제로 산 값이다.
+            LabeledRow("산 환율", "${"%.2f".format(rate)}원")
+        }
+
+        CashWallets.dailyAllowance(wallet, remainingDays)?.let { perDay ->
+            Spacer(Modifier.height(6.dp))
+            LabeledRow(
+                "남은 ${remainingDays}일 · 하루",
+                formatForeign(perDay, wallet.currencyCode),
+            )
+        }
+
+        if (topUps.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            topUps.forEach { topUp ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "${topUp.kind.emoji} ${formatForeign(topUp.amount, topUp.currencyCode)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            "${formatDateWithDay(topUp.date)} · ${formatKrw(topUp.krwPaid)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = { onDelete(topUp.id) }) {
+                        Icon(Icons.Default.Delete, contentDescription = "환전 기록 삭제")
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
+            Text("환전·인출 넣기")
+        }
+    }
+}
+
+/**
+ * 환전 한 건 넣기.
+ *
+ * 받은 현지 통화와 낸 원화를 따로 묻는다. 둘의 비가 곧 수수료까지 포함한 실제 환율이라,
+ * 나중에 "이번 환전이 쌌는지"를 따져 볼 수 있다.
+ */
+@Composable
+private fun TopUpDialog(
+    currencyCode: String,
+    suggestedRate: Double,
+    onDismiss: () -> Unit,
+    onAdd: (TopUpKind, Double, Long, LocalDate, String) -> Unit,
+) {
+    var kind by remember { mutableStateOf(TopUpKind.EXCHANGE) }
+    var amountInput by remember { mutableStateOf("") }
+    var krwInput by remember { mutableStateOf("") }
+    var memo by remember { mutableStateOf("") }
+
+    val amount = amountInput.replace(",", "").toDoubleOrNull() ?: 0.0
+    val krw = krwInput.replace(",", "").toLongOrNull() ?: 0L
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("환전·인출 넣기") },
+        text = {
+            Column {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TopUpKind.entries.take(3).forEach { option ->
+                        FilterChip(
+                            selected = kind == option,
+                            onClick = { kind = option },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                NumberField(
+                    label = "받은 금액 ($currencyCode)",
+                    value = amountInput,
+                    onValueChange = { amountInput = it },
+                    allowDecimal = true,
+                )
+                Spacer(Modifier.height(12.dp))
+                NumberField(
+                    label = "낸 돈 (원)",
+                    value = krwInput,
+                    onValueChange = { krwInput = it },
+                )
+                if (amount > 0.0 && krw <= 0L) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        // 얼마를 냈는지 모르면 여행 환율로 어림한 값을 채워 준다.
+                        "비워 두면 ${formatKrw((amount * suggestedRate).toLong())}으로 둔다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = memo,
+                    onValueChange = { memo = it },
+                    label = { Text("메모 (선택)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val paid = if (krw > 0L) krw else (amount * suggestedRate).toLong()
+                    onAdd(kind, amount, paid, LocalDate.now(), memo.trim())
+                },
+                enabled = amount > 0.0,
+            ) { Text("넣기") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("취소") }
+        },
+    )
+}
+

@@ -6,12 +6,17 @@ import androidx.lifecycle.viewModelScope
 import com.volp.travelbudget.data.photos.PhotoStore
 import com.volp.travelbudget.data.photos.TripPhoto
 import com.volp.travelbudget.data.repository.BookingRepository
+import com.volp.travelbudget.data.repository.CashRepository
 import com.volp.travelbudget.data.repository.ItineraryRepository
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.travel.LocationProvider
 import com.volp.travelbudget.data.travel.PlaceLookup
 import com.volp.travelbudget.data.weather.WeatherRepository
 import com.volp.travelbudget.domain.booking.Booking
+import com.volp.travelbudget.domain.cash.CashTopUp
+import com.volp.travelbudget.domain.cash.CashWallets
+import com.volp.travelbudget.domain.cash.TopUpKind
+import com.volp.travelbudget.domain.cash.WalletSummary
 import com.volp.travelbudget.domain.itinerary.DayTimeline
 import com.volp.travelbudget.domain.itinerary.ItineraryStop
 import com.volp.travelbudget.domain.itinerary.TimelineBuilder
@@ -49,11 +54,16 @@ data class TripUiState(
     val devicePhotos: List<TripPhoto> = emptyList(),
     val packingItems: List<PackingItem> = emptyList(),
     val checkedItems: Set<String> = emptySet(),
+    val cashTopUps: List<CashTopUp> = emptyList(),
     val currentLocation: GeoPoint? = null,
     val rainAlert: RainAlert? = null,
     val loadingWeather: Boolean = false,
     val searchingPlace: Boolean = false,
 ) {
+    /** 지금 지갑에 남은 현지 현금. 여행이 없으면 null. */
+    val wallet: WalletSummary?
+        get() = trip?.let { CashWallets.summarize(cashTopUps, expenses, it.currencyCode) }
+
     fun timelineFor(date: LocalDate): DayTimeline? = timelines.firstOrNull { it.date == date }
 
     fun forecastFor(date: LocalDate): DailyForecast? = forecasts.firstOrNull { it.date == date }
@@ -80,6 +90,7 @@ class TripViewModel(
     private val repository: TripRepository,
     private val itineraryRepository: ItineraryRepository,
     private val bookingRepository: BookingRepository,
+    private val cashRepository: CashRepository,
     private val photoStore: PhotoStore,
     private val placeLookup: PlaceLookup,
     private val locationProvider: LocationProvider,
@@ -110,7 +121,8 @@ class TripViewModel(
     private val record = combine(
         photoStore.observeSaved(tripId),
         itineraryRepository.observePackingChecks(tripId),
-    ) { photos, checks -> Record(photos, checks) }
+        cashRepository.observeTopUps(tripId),
+    ) { photos, checks, cash -> Record(photos, checks, cash) }
 
     private val live = combine(
         forecasts,
@@ -141,6 +153,7 @@ class TripViewModel(
             devicePhotos = v.devicePhotos,
             packingItems = if (trip == null) emptyList() else PackingAdvisor.suggest(trip, v.forecasts),
             checkedItems = r.checks,
+            cashTopUps = r.cash,
             currentLocation = v.location,
             rainAlert = v.rain,
             loadingWeather = v.loadingWeather,
@@ -151,6 +164,41 @@ class TripViewModel(
     init {
         refreshLocation()
         loadWeather()
+    }
+
+    // ---- 현금 지갑 ----
+
+    /**
+     * 환전하거나 인출한 현금을 지갑에 넣는다.
+     *
+     * 낸 원화를 함께 받아 두는 것이 중요하다. 고시환율이 아니라 수수료까지 물고 실제로 산 환율이
+     * 그 안에 들어 있기 때문이다.
+     */
+    fun addTopUp(
+        kind: TopUpKind,
+        amount: Double,
+        krwPaid: Long,
+        date: LocalDate = LocalDate.now(),
+        memo: String = "",
+    ) {
+        val trip = state.value.trip ?: return
+        viewModelScope.launch {
+            cashRepository.save(
+                CashTopUp(
+                    tripId = trip.id,
+                    kind = kind,
+                    currencyCode = trip.currencyCode,
+                    amount = amount,
+                    krwPaid = krwPaid,
+                    date = date,
+                    memo = memo,
+                ),
+            )
+        }
+    }
+
+    fun deleteTopUp(id: Long) {
+        viewModelScope.launch { cashRepository.delete(id) }
     }
 
     // ---- 위치와 날씨 ----
@@ -298,6 +346,7 @@ class TripViewModel(
     private data class Record(
         val photos: List<TripPhoto>,
         val checks: Set<String>,
+        val cash: List<CashTopUp>,
     )
 
     private data class Live(

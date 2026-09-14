@@ -7,6 +7,8 @@ import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.domain.budget.BudgetPredictor
 import com.volp.travelbudget.domain.budget.CurrencyRates
 import com.volp.travelbudget.domain.budget.DestinationCatalog
+import com.volp.travelbudget.domain.budget.SpendingProfile
+import com.volp.travelbudget.domain.budget.SpendingProfiles
 import com.volp.travelbudget.domain.model.Destination
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.domain.model.Region
@@ -33,6 +35,8 @@ data class NewTripUiState(
     val includeFlight: Boolean = true,
     val currencyCode: String = "JPY",
     val exchangeRate: String = "9.3",
+    /** 지난 여행에서 배운 내 씀씀이. 아직 배운 것이 없으면 비어 있다. */
+    val profile: SpendingProfile = SpendingProfile(),
 ) {
     val isCustomDestination: Boolean
         get() = destinationKey.startsWith(DestinationCatalog.CUSTOM_KEY_PREFIX)
@@ -49,7 +53,8 @@ data class NewTripUiState(
     val nights: Int
         get() = ChronoUnit.DAYS.between(startDate, endDate).toInt().coerceAtLeast(0)
 
-    val prediction: Map<ExpenseCategory, Long>
+    /** 도시·스타일 표만 보고 낸 값. 보정 전후를 견주어 보여 주려고 남긴다. */
+    val basePrediction: Map<ExpenseCategory, Long>
         get() = BudgetPredictor.predict(
             BudgetPredictor.Input(
                 destination = destination,
@@ -59,6 +64,13 @@ data class NewTripUiState(
                 includeFlight = includeFlight,
             ),
         )
+
+    val prediction: Map<ExpenseCategory, Long>
+        get() = profile.apply(basePrediction)
+
+    /** 보정으로 달라진 금액. 0이면 보정이 없었다는 뜻이다. */
+    val profileDelta: Long
+        get() = prediction.values.sum() - basePrediction.values.sum()
 
     val predictedTotal: Long get() = prediction.values.sum()
 
@@ -77,6 +89,15 @@ class NewTripViewModel(
     init {
         // 기본값 대신 받아 둔 환율을 채워 넣는다.
         refreshRate(_state.value.currencyCode)
+        learnFromPastTrips()
+    }
+
+    /** 지난 여행이 있으면 예측을 내 쪽으로 당긴다. */
+    private fun learnFromPastTrips() {
+        viewModelScope.launch {
+            val profile = SpendingProfiles.learn(repository.finishedOutcomes())
+            if (!profile.isEmpty) _state.update { it.copy(profile = profile) }
+        }
     }
 
     private val _createdTripId = MutableStateFlow<Long?>(null)

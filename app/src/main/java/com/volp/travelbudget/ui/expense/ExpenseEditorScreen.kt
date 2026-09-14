@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.domain.budget.CurrencyRates
 import com.volp.travelbudget.domain.model.ExpenseCategory
+import com.volp.travelbudget.domain.model.PaymentMethod
 import com.volp.travelbudget.ui.common.DateField
 import com.volp.travelbudget.ui.common.NumberField
 import com.volp.travelbudget.ui.common.SectionCard
@@ -172,6 +173,24 @@ fun ExpenseEditorScreen(
                         )
                     }
                 }
+            }
+
+            SectionCard("무엇으로 냈나요") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PaymentMethod.entries.forEach { method ->
+                        FilterChip(
+                            selected = state.method == method,
+                            onClick = { viewModel.setMethod(method) },
+                            label = { Text("${method.emoji} ${method.label}") },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "현금으로 고르면 여행 지갑에서 그만큼 빠진다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             SectionCard("언제, 어디서") {
