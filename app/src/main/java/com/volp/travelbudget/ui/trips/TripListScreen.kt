@@ -3,6 +3,8 @@
 package com.volp.travelbudget.ui.trips
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,11 +21,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,12 +60,14 @@ fun TripListScreen(
     onOpenSettings: () -> Unit,
     onOpenInbox: () -> Unit,
     onQuickExpense: () -> Unit,
+    onOpenPurchases: () -> Unit,
 ) {
     val viewModel: TripListViewModel = viewModel(
-        factory = volpViewModelFactory { TripListViewModel(it.repository) },
+        factory = volpViewModelFactory { TripListViewModel(it.repository, it.settings) },
     )
     val trips by viewModel.trips.collectAsStateWithLifecycle()
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
+    val sort by viewModel.sort.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -70,6 +76,9 @@ fun TripListScreen(
                 actions = {
                     IconButton(onClick = onQuickExpense) {
                         Icon(Icons.Default.Bolt, contentDescription = "현금 빠른 입력")
+                    }
+                    IconButton(onClick = onOpenPurchases) {
+                        Icon(Icons.Default.LocalShipping, contentDescription = "구매·배송")
                     }
                     BadgedBox(
                         badge = {
@@ -104,10 +113,32 @@ fun TripListScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // 여행이 하나뿐이면 정렬 단추가 자리만 차지한다.
+                if (trips.size > 1) {
+                    item(key = "sort") {
+                        SortRow(selected = sort, onSelect = viewModel::changeSort)
+                    }
+                }
                 items(trips, key = { it.trip.id }) { item ->
                     TripCard(item = item, onClick = { onOpenTrip(item.trip.id) })
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SortRow(selected: TripSort, onSelect: (TripSort) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TripSort.entries.forEach { option ->
+            FilterChip(
+                selected = option == selected,
+                onClick = { onSelect(option) },
+                label = { Text(option.label) },
+            )
         }
     }
 }

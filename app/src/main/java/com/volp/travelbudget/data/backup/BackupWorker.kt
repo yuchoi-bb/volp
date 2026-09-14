@@ -33,7 +33,7 @@ class BackupWorker(
 
         val token = silentAccessToken() ?: return Result.success()
         return runCatching {
-            BackupManager(application.repository, application.settings).backup(token)
+            application.backupManager.backup(token)
         }.fold(
             onSuccess = { Result.success() },
             onFailure = { Result.retry() },

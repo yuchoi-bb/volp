@@ -1,5 +1,6 @@
 package com.volp.travelbudget.domain.model
 
+import com.volp.travelbudget.domain.sync.Syncable
 import java.time.LocalDate
 
 /**
@@ -10,6 +11,8 @@ import java.time.LocalDate
  */
 data class Expense(
     val id: Long = 0L,
+    override val uid: String = "",
+    override val updatedAt: Long = 0L,
     val tripId: Long,
     val category: ExpenseCategory,
     val amountKrw: Long,
@@ -20,7 +23,7 @@ data class Expense(
     /** 이 건에 적용한 환율(1 [currencyCode] 당 원). 나중에 실제 청구액으로 보정할 때 쓴다. */
     val exchangeRate: Double? = null,
     val createdAt: Long = System.currentTimeMillis(),
-) {
+) : Syncable {
     val enteredInForeignCurrency: Boolean
         get() = originalAmount != null && currencyCode != "KRW"
 

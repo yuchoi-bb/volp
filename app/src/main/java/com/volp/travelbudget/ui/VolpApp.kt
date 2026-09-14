@@ -25,6 +25,8 @@ import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.ui.expense.ExpenseEditorScreen
 import com.volp.travelbudget.ui.inbox.InboxScreen
 import com.volp.travelbudget.ui.newtrip.NewTripScreen
+import com.volp.travelbudget.ui.purchase.PurchaseEditorScreen
+import com.volp.travelbudget.ui.purchase.PurchaseListScreen
 import com.volp.travelbudget.ui.quick.QuickExpenseScreen
 import com.volp.travelbudget.ui.settings.SettingsScreen
 import com.volp.travelbudget.ui.stats.TripStatsScreen
@@ -39,12 +41,15 @@ object Routes {
     const val NEW_TRIP = "trips/new"
     const val SETTINGS = "settings"
     const val INBOX = "inbox"
+    const val PURCHASES = "purchases"
 
     fun tripDetail(tripId: Long) = "trips/$tripId"
     fun budgetEdit(tripId: Long) = "trips/$tripId/budget"
     fun stats(tripId: Long) = "trips/$tripId/stats"
     fun expenseEditor(tripId: Long, expenseId: Long = 0L) = "trips/$tripId/expense?expenseId=$expenseId"
     fun quickExpense(tripId: Long = 0L) = "quick?tripId=$tripId"
+    fun purchaseEditor(purchaseId: Long = 0L, tripId: Long = 0L) =
+        "purchases/editor?purchaseId=$purchaseId&tripId=$tripId"
     fun bookingEditor(tripId: Long, bookingId: Long = 0L, date: LocalDate? = null) =
         "trips/$tripId/booking?bookingId=$bookingId&date=${date?.toString().orEmpty()}"
 
@@ -54,6 +59,7 @@ object Routes {
     const val EXPENSE_EDITOR_PATTERN = "trips/{tripId}/expense?expenseId={expenseId}"
     const val QUICK_EXPENSE_PATTERN = "quick?tripId={tripId}"
     const val BOOKING_EDITOR_PATTERN = "trips/{tripId}/booking?bookingId={bookingId}&date={date}"
+    const val PURCHASE_EDITOR_PATTERN = "purchases/editor?purchaseId={purchaseId}&tripId={tripId}"
 }
 
 @Composable
@@ -109,6 +115,35 @@ fun VolpApp(
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                     onOpenInbox = { navController.navigate(Routes.INBOX) },
                     onQuickExpense = { navController.navigate(Routes.quickExpense()) },
+                    onOpenPurchases = { navController.navigate(Routes.PURCHASES) },
+                )
+            }
+
+            composable(Routes.PURCHASES) {
+                PurchaseListScreen(
+                    onBack = { navController.popBackStack() },
+                    onAdd = { navController.navigate(Routes.purchaseEditor()) },
+                    onEdit = { navController.navigate(Routes.purchaseEditor(purchaseId = it)) },
+                )
+            }
+
+            composable(
+                route = Routes.PURCHASE_EDITOR_PATTERN,
+                arguments = listOf(
+                    navArgument("purchaseId") {
+                        type = NavType.LongType
+                        defaultValue = 0L
+                    },
+                    navArgument("tripId") {
+                        type = NavType.LongType
+                        defaultValue = 0L
+                    },
+                ),
+            ) { entry ->
+                PurchaseEditorScreen(
+                    purchaseId = entry.arguments?.getLong("purchaseId") ?: 0L,
+                    tripId = entry.arguments?.getLong("tripId")?.takeIf { it > 0L },
+                    onDone = { navController.popBackStack() },
                 )
             }
 

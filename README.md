@@ -21,7 +21,12 @@
 - 여행 기간에 찍은 **기기 사진**을 모아 보여 주고, 영수증 사진을 지출에 붙인다.
 
 **그 밖에**
+- 여행 전에 산 것(항공권·캐리어 등)을 **도착 예정일(ETA)과 함께** 기록한다. 주문 문자를
+  Volp로 **공유**하거나 글을 **블록으로 잡아 넘기면** 금액·예정일·송장번호를 읽어 채운다.
+  출발 전에 못 받을 것 같으면 미리 알려 준다.
 - 기록을 **Google Drive의 `볼프` 폴더**에 백업한다(복원용 JSON + 열람용 CSV).
+- **다른 안드로이드 기기와 같은 기록을 쓴다**(Firestore). 기록 하나하나를 짝지어 합치므로
+  두 폰에서 각자 넣은 것이 사라지지 않는다. → [설정 방법](docs/firebase-setup.md)
 - 새 빌드가 올라오면 앱이 알려 주고, 확인을 받아 **직접 내려받아 설치**한다.
 
 ## 쓰는 외부 서비스
@@ -35,6 +40,7 @@
 | 장소 좌표 | 안드로이드 내장 지오코더 | 필요 없음 |
 | 길찾기 | Google 지도 앱으로 넘김 | 필요 없음 |
 | 백업 | Google Drive (`drive.file` 범위) | 사용자 OAuth |
+| 기기 동기화 | Firebase Firestore + 익명 로그인 | `GOOGLE_SERVICES_JSON` 시크릿 |
 | 업데이트 | GitHub Releases | 공개 저장소 |
 
 ## 빌드
@@ -50,6 +56,8 @@ GitHub 릴리스로 올린다. 태그는 `v<versionName>` 형식이고 마지막
 | `KEYSTORE_PASSWORD` | 키스토어 비밀번호 |
 | `KEY_ALIAS` | 키 별칭 |
 | `KEY_PASSWORD` | 키 비밀번호 |
+| `MAPS_API_KEY` | Maps SDK for Android 키. 없으면 지도 대신 지도 앱 링크가 뜬다 |
+| `GOOGLE_SERVICES_JSON` | `google-services.json`을 base64로 인코딩한 값. 없으면 기기 동기화가 꺼진다 |
 
 시크릿이 없으면 디버그 키로 서명되며, 기존 설치본 위에 업데이트되지 않는다.
 

@@ -114,7 +114,7 @@ class BackupViewModel(
                     if (count == null) {
                         BackupState.Failed("드라이브에 백업 파일이 없다")
                     } else {
-                        BackupState.Done("여행 ${count}건을 복원했다")
+                        BackupState.Done("기록 ${count}건을 가져왔다")
                     }
                 }
             }

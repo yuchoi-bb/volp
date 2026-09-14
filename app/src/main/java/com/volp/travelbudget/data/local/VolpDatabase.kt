@@ -21,8 +21,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BudgetAlertEntity::class,
         BookingEntity::class,
         DayNoteEntity::class,
+        DeletionEntity::class,
+        PurchaseEntity::class,
     ],
-    version = 8,
+    version = 10,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -45,6 +47,10 @@ abstract class VolpDatabase : RoomDatabase() {
     abstract fun budgetAlertDao(): BudgetAlertDao
 
     abstract fun bookingDao(): BookingDao
+
+    abstract fun syncDao(): SyncDao
+
+    abstract fun purchaseDao(): PurchaseDao
 
     companion object {
         private const val DATABASE_NAME = "volp.db"
@@ -242,6 +248,72 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * 기기 두 대에서 같은 기록을 쓰기 위한 준비.
+         *
+         * 로컬 행 번호는 기기마다 다르게 매겨져 두 대를 맞출 때 쓸 수 없다. 기록마다 기기와
+         * 무관한 uid를 붙이고, 지운 기록은 흔적을 남겨 다음 동기화에서 되살아나지 않게 한다.
+         */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val now = System.currentTimeMillis()
+                listOf("trips", "expenses", "bookings", "itinerary_stops").forEach { table ->
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `uid` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0")
+                    // 이미 있던 기록에도 uid를 붙여 준다.
+                    db.execSQL("UPDATE `$table` SET `uid` = lower(hex(randomblob(16))), `updatedAt` = $now")
+                }
+                db.execSQL("ALTER TABLE `packing_checks` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE `packing_checks` SET `updatedAt` = $now")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `deletions` (
+                        `entity` TEXT NOT NULL,
+                        `uid` TEXT NOT NULL,
+                        `deletedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`entity`, `uid`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        /** 여행 전에 사 두는 것들(항공권·캐리어 같은)과 그 도착 예정일을 더한 버전. */
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `purchases` (
+                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        `uid` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `tripId` INTEGER,
+                        `kind` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `merchant` TEXT NOT NULL,
+                        `amountKrw` INTEGER NOT NULL,
+                        `originalAmount` REAL,
+                        `currencyCode` TEXT NOT NULL,
+                        `orderedOn` TEXT,
+                        `eta` TEXT,
+                        `status` TEXT NOT NULL,
+                        `orderNumber` TEXT NOT NULL,
+                        `trackingNumber` TEXT NOT NULL,
+                        `carrier` TEXT NOT NULL,
+                        `memo` TEXT NOT NULL,
+                        `sourceText` TEXT NOT NULL,
+                        `expenseId` INTEGER,
+                        `createdAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`tripId`) REFERENCES `trips`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_purchases_tripId` ON `purchases` (`tripId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_purchases_uid` ON `purchases` (`uid`)")
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -260,6 +332,8 @@ abstract class VolpDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
+                    MIGRATION_8_9,
+                    MIGRATION_9_10,
                 )
                 .build()
     }

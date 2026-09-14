@@ -1,5 +1,6 @@
 package com.volp.travelbudget.domain.booking
 
+import com.volp.travelbudget.domain.sync.Syncable
 import com.volp.travelbudget.domain.travel.GeoPoint
 import java.time.LocalDateTime
 
@@ -30,6 +31,8 @@ enum class BookingType(val label: String, val emoji: String) {
  */
 data class Booking(
     val id: Long = 0L,
+    override val uid: String = "",
+    override val updatedAt: Long = 0L,
     val tripId: Long,
     val type: BookingType,
     /** 편명이나 숙소 이름처럼 이 예약을 가리키는 말. */
@@ -51,7 +54,7 @@ data class Booking(
     val terminal: String = "",
     val memo: String = "",
     val point: GeoPoint? = null,
-) {
+) : Syncable {
     /** 숙소처럼 며칠에 걸친 예약인지. */
     val spansNights: Boolean
         get() = type == BookingType.LODGING && endAt != null &&

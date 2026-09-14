@@ -38,6 +38,14 @@ data class VolpSettings(
     val lastUpdateCheckAt: Long = 0L,
     /** 사용자가 건너뛴 버전. 같은 버전은 다시 묻지 않는다. */
     val skippedVersionCode: Int = 0,
+    /** 여행 목록을 늘어놓는 차례. [com.volp.travelbudget.ui.trips.TripSort]의 이름이다. */
+    val tripSort: String = "",
+    /** 기기끼리 기록을 맞출 때 쓰는 공유 코드. 비어 있으면 이 기기만 쓴다. */
+    val syncCode: String = "",
+    /** 기록이 바뀔 때마다 자동으로 맞출지. */
+    val autoSyncEnabled: Boolean = true,
+    /** 마지막으로 동기화에 성공한 시각(epoch millis). 이 뒤에 바뀐 것만 주고받는다. */
+    val lastSyncAt: Long = 0L,
 )
 
 class AppSettings(private val context: Context) {
@@ -54,6 +62,10 @@ class AppSettings(private val context: Context) {
         val driveFolderId = stringPreferencesKey("drive_folder_id")
         val lastUpdateCheckAt = longPreferencesKey("last_update_check_at")
         val skippedVersionCode = intPreferencesKey("skipped_version_code")
+        val tripSort = stringPreferencesKey("trip_sort")
+        val syncCode = stringPreferencesKey("sync_code")
+        val autoSyncEnabled = booleanPreferencesKey("auto_sync_enabled")
+        val lastSyncAt = longPreferencesKey("last_sync_at")
     }
 
     val settings: Flow<VolpSettings> = context.settingsStore.data.map { prefs ->
@@ -69,6 +81,10 @@ class AppSettings(private val context: Context) {
             driveFolderId = prefs[Keys.driveFolderId],
             lastUpdateCheckAt = prefs[Keys.lastUpdateCheckAt] ?: 0L,
             skippedVersionCode = prefs[Keys.skippedVersionCode] ?: 0,
+            tripSort = prefs[Keys.tripSort] ?: "",
+            syncCode = prefs[Keys.syncCode] ?: "",
+            autoSyncEnabled = prefs[Keys.autoSyncEnabled] ?: true,
+            lastSyncAt = prefs[Keys.lastSyncAt] ?: 0L,
         )
     }
 
@@ -93,6 +109,14 @@ class AppSettings(private val context: Context) {
     suspend fun setLastUpdateCheckAt(value: Long) = edit { it[Keys.lastUpdateCheckAt] = value }
 
     suspend fun setSkippedVersionCode(value: Int) = edit { it[Keys.skippedVersionCode] = value }
+
+    suspend fun setTripSort(value: String) = edit { it[Keys.tripSort] = value }
+
+    suspend fun setSyncCode(value: String) = edit { it[Keys.syncCode] = value.trim() }
+
+    suspend fun setAutoSyncEnabled(value: Boolean) = edit { it[Keys.autoSyncEnabled] = value }
+
+    suspend fun setLastSyncAt(value: Long) = edit { it[Keys.lastSyncAt] = value }
 
     private suspend fun edit(block: suspend (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.settingsStore.edit(block)

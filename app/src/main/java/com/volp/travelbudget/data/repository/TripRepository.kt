@@ -1,6 +1,5 @@
 package com.volp.travelbudget.data.repository
 
-import com.volp.travelbudget.data.backup.TripBackup
 import com.volp.travelbudget.data.exchange.ExchangeRateRepository
 import com.volp.travelbudget.data.local.CaptureSource
 import com.volp.travelbudget.data.local.ExpenseDao
@@ -9,6 +8,8 @@ import com.volp.travelbudget.data.local.MerchantAliasEntity
 import com.volp.travelbudget.data.local.PendingStatus
 import com.volp.travelbudget.data.local.PendingTransaction
 import com.volp.travelbudget.data.local.PendingTransactionDao
+import com.volp.travelbudget.data.local.DeletionEntity
+import com.volp.travelbudget.data.local.SyncDao
 import com.volp.travelbudget.data.local.TripDao
 import com.volp.travelbudget.data.local.normalizeMerchantKey
 import com.volp.travelbudget.data.local.toDomain
@@ -21,6 +22,7 @@ import com.volp.travelbudget.domain.cardsms.CardTransaction
 import com.volp.travelbudget.domain.cardsms.TransactionKind
 import com.volp.travelbudget.domain.classify.RuleBasedMerchantClassifier
 import com.volp.travelbudget.domain.settlement.Settlement
+import com.volp.travelbudget.domain.sync.SyncIds
 import com.volp.travelbudget.domain.summary.TripSummaries
 import com.volp.travelbudget.domain.summary.TripSummary
 import kotlinx.coroutines.flow.Flow
@@ -49,6 +51,7 @@ class TripRepository(
     private val expenseDao: ExpenseDao,
     private val pendingDao: PendingTransactionDao,
     private val aliasDao: MerchantAliasDao,
+    private val syncDao: SyncDao,
     private val exchangeRates: ExchangeRateRepository,
 ) {
 
@@ -88,11 +91,17 @@ class TripRepository(
     /** 지금 시점의 여행 목록. 한 번만 읽으면 되는 곳에 쓴다. */
     suspend fun tripsOnce(): List<Trip> = tripDao.findAll().map { it.toDomain() }
 
-    suspend fun createTrip(trip: Trip): Long = tripDao.insert(trip.toEntity())
+    suspend fun createTrip(trip: Trip): Long = tripDao.insert(trip.stamped().toEntity())
 
-    suspend fun updateTrip(trip: Trip) = tripDao.update(trip.toEntity())
+    suspend fun updateTrip(trip: Trip) = tripDao.update(trip.stamped().toEntity())
 
-    suspend fun deleteTrip(tripId: Long) = tripDao.deleteById(tripId)
+    /** 지운 것도 다른 기기로 옮겨져야 하므로 흔적을 남긴다. */
+    suspend fun deleteTrip(tripId: Long) {
+        syncDao.tripUid(tripId)?.let { uid ->
+            syncDao.recordDeletion(DeletionEntity("trip", uid, SyncIds.now()))
+        }
+        tripDao.deleteById(tripId)
+    }
 
     suspend fun getExpense(expenseId: Long): Expense? = expenseDao.findById(expenseId)?.toDomain()
 
@@ -100,11 +109,16 @@ class TripRepository(
     suspend fun expensesOnce(tripId: Long): List<Expense> =
         expenseDao.findByTrip(tripId).map { it.toDomain() }
 
-    suspend fun addExpense(expense: Expense): Long = expenseDao.insert(expense.toEntity())
+    suspend fun addExpense(expense: Expense): Long = expenseDao.insert(expense.stamped().toEntity())
 
-    suspend fun updateExpense(expense: Expense) = expenseDao.update(expense.toEntity())
+    suspend fun updateExpense(expense: Expense) = expenseDao.update(expense.stamped().toEntity())
 
-    suspend fun deleteExpense(expenseId: Long) = expenseDao.deleteById(expenseId)
+    suspend fun deleteExpense(expenseId: Long) {
+        syncDao.expenseUid(expenseId)?.let { uid ->
+            syncDao.recordDeletion(DeletionEntity("expense", uid, SyncIds.now()))
+        }
+        expenseDao.deleteById(expenseId)
+    }
 
     // ---- 카드 문자에서 모은 결제 ----
 
@@ -227,7 +241,7 @@ class TripRepository(
             memo = memoOverride?.takeIf { it.isNotBlank() } ?: pending.merchant,
             exchangeRate = if (pending.isOverseas) rate else null,
         )
-        val expenseId = expenseDao.insert(expense.toEntity())
+        val expenseId = expenseDao.insert(expense.stamped().toEntity())
         pendingDao.updateStatus(pendingId, PendingStatus.ACCEPTED.name, tripId, expenseId)
         return expenseId
     }
@@ -252,39 +266,15 @@ class TripRepository(
         val expenses = expenseDao.findByTrip(tripId).map { it.toDomain() }
         val factor = if (billedTotalKrw == null) 1.0 else Settlement.factorFor(billedTotalKrw, expenses)
 
-        Settlement.apply(expenses, factor).forEach { expenseDao.update(it.toEntity()) }
+        Settlement.apply(expenses, factor).forEach { expenseDao.update(it.stamped().toEntity()) }
         tripDao.update(
             trip.copy(billedTotalKrw = billedTotalKrw, settlementFactor = factor).toEntity(),
         )
     }
-
-    // ---- 백업 ----
-
-    /** 백업에 담을 전체 기록. */
-    suspend fun exportAll(): List<TripBackup> =
-        tripDao.findAll().map { entity ->
-            TripBackup(
-                trip = entity.toDomain(),
-                expenses = expenseDao.findByTrip(entity.id).map { it.toDomain() },
-            )
-        }
-
-    /**
-     * 백업으로 기존 기록을 덮어쓴다.
-     *
-     * 합치기가 아니라 통째로 교체한다. 혼자 쓰는 앱이라 기기를 바꿨을 때 되살리는 용도가
-     * 대부분이고, 합치기는 같은 지출이 두 번 들어가기 쉽다.
-     *
-     * @return 복원한 여행 수
-     */
-    suspend fun importAll(backups: List<TripBackup>): Int {
-        tripDao.deleteAll()
-        backups.forEach { backup ->
-            val tripId = tripDao.insert(backup.trip.copy(id = 0L).toEntity())
-            backup.expenses.forEach { expense ->
-                expenseDao.insert(expense.copy(id = 0L, tripId = tripId).toEntity())
-            }
-        }
-        return backups.size
-    }
 }
+
+private fun Trip.stamped(): Trip =
+    copy(uid = uid.ifBlank { SyncIds.newUid() }, updatedAt = SyncIds.now())
+
+private fun Expense.stamped(): Expense =
+    copy(uid = uid.ifBlank { SyncIds.newUid() }, updatedAt = SyncIds.now())

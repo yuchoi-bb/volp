@@ -1,5 +1,6 @@
 package com.volp.travelbudget.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -29,6 +30,8 @@ import java.time.LocalDateTime
 )
 data class BookingEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    @ColumnInfo(defaultValue = "") val uid: String,
+    @ColumnInfo(defaultValue = "0") val updatedAt: Long,
     val tripId: Long,
     val type: String,
     val title: String,
@@ -99,6 +102,8 @@ interface BookingDao {
 
 fun BookingEntity.toDomain(): Booking = Booking(
     id = id,
+    uid = uid,
+    updatedAt = updatedAt,
     tripId = tripId,
     type = BookingType.fromName(type),
     title = title,
@@ -120,6 +125,8 @@ fun BookingEntity.toDomain(): Booking = Booking(
 
 fun Booking.toEntity(): BookingEntity = BookingEntity(
     id = id,
+    uid = uid,
+    updatedAt = updatedAt,
     tripId = tripId,
     type = type.name,
     title = title,

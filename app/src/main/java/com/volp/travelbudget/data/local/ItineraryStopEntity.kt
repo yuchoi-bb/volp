@@ -1,5 +1,6 @@
 package com.volp.travelbudget.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
@@ -28,6 +29,8 @@ import java.time.LocalDate
 )
 data class ItineraryStopEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    @ColumnInfo(defaultValue = "") val uid: String,
+    @ColumnInfo(defaultValue = "0") val updatedAt: Long,
     val tripId: Long,
     val date: LocalDate,
     /** 같은 날 안에서의 순서. 동선은 이 순서대로 이어진다. */
@@ -48,6 +51,7 @@ data class PackingCheckEntity(
     val tripId: Long,
     val itemName: String,
     val checked: Boolean,
+    @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0L,
 )
 
 @Dao

@@ -27,6 +27,13 @@ val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() && file(releaseStoreFi
 val mapsApiKey: String =
     System.getenv("MAPS_API_KEY") ?: keystoreProperties.getProperty("mapsApiKey") ?: ""
 
+// 기기끼리 기록을 맞추는 Firestore 설정. 저장소에 두지 않으므로 없으면 없는 대로 빌드된다.
+val googleServicesFile = file("google-services.json")
+val hasFirebase = googleServicesFile.exists()
+if (hasFirebase) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.volp.travelbudget"
     compileSdk = 35
@@ -46,6 +53,7 @@ android {
         // 지도 키는 저장소에 두지 않는다. CI는 시크릿으로, 로컬은 keystore.properties로 넣는다.
         manifestPlaceholders["mapsApiKey"] = mapsApiKey
         buildConfigField("boolean", "HAS_MAPS_KEY", mapsApiKey.isNotBlank().toString())
+        buildConfigField("boolean", "HAS_FIREBASE", hasFirebase.toString())
     }
 
     signingConfigs {
@@ -124,6 +132,9 @@ dependencies {
     implementation(libs.play.services.maps)
     implementation(libs.maps.compose)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.auth)
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
 

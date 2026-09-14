@@ -1,5 +1,6 @@
 package com.volp.travelbudget.domain.model
 
+import com.volp.travelbudget.domain.sync.Syncable
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -9,6 +10,9 @@ import java.time.temporal.ChronoUnit
  */
 data class Trip(
     val id: Long = 0L,
+    /** 기기가 달라도 같은 여행임을 알아보게 하는 값. */
+    override val uid: String = "",
+    override val updatedAt: Long = 0L,
     val title: String,
     val destinationKey: String,
     val destinationName: String,
@@ -32,7 +36,7 @@ data class Trip(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val createdAt: Long = System.currentTimeMillis(),
-) {
+) : Syncable {
     val nights: Int
         get() = ChronoUnit.DAYS.between(startDate, endDate).toInt().coerceAtLeast(0)
 

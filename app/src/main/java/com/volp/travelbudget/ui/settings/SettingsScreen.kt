@@ -63,11 +63,20 @@ fun SettingsScreen(
 
     val backupViewModel: BackupViewModel = viewModel(
         factory = volpViewModelFactory { app ->
-            BackupViewModel(app, BackupManager(app.repository, app.settings))
+            BackupViewModel(app, app.backupManager)
         },
     )
     val backupState by backupViewModel.state.collectAsStateWithLifecycle()
     var confirmRestore by remember { mutableStateOf(false) }
+
+    val syncViewModel: DeviceSyncViewModel = viewModel(
+        factory = volpViewModelFactory { app ->
+            DeviceSyncViewModel(app.settings, app.firestoreSync)
+        },
+    )
+    val syncState by syncViewModel.state.collectAsStateWithLifecycle()
+    val syncStatus by syncViewModel.status.collectAsStateWithLifecycle()
+    var codeInput by remember { mutableStateOf("") }
 
     val consentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
@@ -164,6 +173,109 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+
+            SectionCard("다른 기기와 함께 쓰기") {
+                if (!BuildConfig.HAS_FIREBASE) {
+                    Text(
+                        "이 빌드에는 Firebase 설정이 없어 기기끼리 맞출 수 없다. " +
+                            "GOOGLE_SERVICES_JSON 시크릿을 넣고 다시 빌드하면 켜진다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                Text(
+                    "같은 동기화 코드를 넣은 안드로이드 기기끼리 같은 기록을 본다. " +
+                        "코드는 비밀번호와 같으니 남에게 알리지 않는다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(12.dp))
+                if (syncState.hasCode) {
+                    Text("내 동기화 코드", style = MaterialTheme.typography.labelMedium)
+                    Text(syncState.code, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "마지막 동기화 ${formatTimestamp(syncState.lastSyncAt)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        "아직 코드가 없다. 첫 기기에서 코드를 만들고, 다른 기기에서는 그 코드를 넣는다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+                ToggleRow(
+                    label = "앱을 열 때와 몇 시간마다 자동으로 맞추기",
+                    checked = syncState.autoEnabled,
+                    onCheckedChange = syncViewModel::setAutoEnabled,
+                )
+
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = syncViewModel::syncNow,
+                        enabled = syncState.hasCode && syncStatus !is DeviceSyncStatus.Working,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("지금 맞추기") }
+                    OutlinedButton(
+                        onClick = syncViewModel::createCode,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(if (syncState.hasCode) "새 코드" else "코드 만들기") }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = codeInput,
+                    onValueChange = { codeInput = it },
+                    label = { Text("다른 기기의 코드 넣기") },
+                    placeholder = { Text("예: A3F9-K2MP-7XQR-5TWB") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        syncViewModel.applyCode(codeInput)
+                        codeInput = ""
+                    },
+                    enabled = codeInput.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("이 코드로 맞추기") }
+
+                when (val status = syncStatus) {
+                    is DeviceSyncStatus.Working -> {
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.height(18.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text("  맞추는 중", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    is DeviceSyncStatus.Done -> {
+                        Spacer(Modifier.height(12.dp))
+                        Text(status.message, style = MaterialTheme.typography.bodySmall)
+                    }
+                    is DeviceSyncStatus.Failed -> {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            status.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    DeviceSyncStatus.Idle -> Unit
+                }
             }
 
             SectionCard("백업") {

@@ -3,6 +3,7 @@ package com.volp.travelbudget
 import android.app.Application
 import com.volp.travelbudget.data.alert.BudgetAlertNotifier
 import com.volp.travelbudget.data.alert.RainAlertWorker
+import com.volp.travelbudget.data.backup.BackupManager
 import com.volp.travelbudget.data.backup.BackupWorker
 import com.volp.travelbudget.data.capture.CardCaptureHandler
 import com.volp.travelbudget.data.exchange.ExchangeRateRepository
@@ -10,14 +11,19 @@ import com.volp.travelbudget.data.local.VolpDatabase
 import com.volp.travelbudget.data.photos.PhotoStore
 import com.volp.travelbudget.data.repository.BookingRepository
 import com.volp.travelbudget.data.repository.ItineraryRepository
+import com.volp.travelbudget.data.repository.PurchaseRepository
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.travel.LocationProvider
 import com.volp.travelbudget.data.travel.PlaceLookup
 import com.volp.travelbudget.data.weather.WeatherRepository
 import com.volp.travelbudget.data.settings.AppSettings
+import com.volp.travelbudget.data.sync.FirestoreSync
+import com.volp.travelbudget.data.sync.SyncEngine
+import com.volp.travelbudget.data.sync.SyncWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -37,6 +43,7 @@ class VolpApplication : Application() {
             expenseDao = database.expenseDao(),
             pendingDao = database.pendingTransactionDao(),
             aliasDao = database.merchantAliasDao(),
+            syncDao = database.syncDao(),
             exchangeRates = exchangeRates,
         )
     }
@@ -46,11 +53,38 @@ class VolpApplication : Application() {
     val photoStore: PhotoStore by lazy { PhotoStore(this, database.tripPhotoDao()) }
 
     val itineraryRepository: ItineraryRepository by lazy {
-        ItineraryRepository(database.itineraryDao())
+        ItineraryRepository(database.itineraryDao(), database.syncDao())
     }
 
     val bookingRepository: BookingRepository by lazy {
-        BookingRepository(database.bookingDao())
+        BookingRepository(database.bookingDao(), database.syncDao())
+    }
+
+    val purchaseRepository: PurchaseRepository by lazy {
+        PurchaseRepository(
+            dao = database.purchaseDao(),
+            syncDao = database.syncDao(),
+            trips = repository,
+            exchangeRates = exchangeRates,
+        )
+    }
+
+    /** 기기끼리 기록을 맞출 때 쓰는 합치기 엔진. 드라이브 백업도 같은 것을 쓴다. */
+    val syncEngine: SyncEngine by lazy {
+        SyncEngine(
+            tripDao = database.tripDao(),
+            expenseDao = database.expenseDao(),
+            bookingDao = database.bookingDao(),
+            purchaseDao = database.purchaseDao(),
+            syncDao = database.syncDao(),
+        )
+    }
+
+    val backupManager: BackupManager by lazy { BackupManager(syncEngine, settings) }
+
+    /** 다른 안드로이드 기기와 기록을 맞춘다. */
+    val firestoreSync: FirestoreSync by lazy {
+        FirestoreSync(this, syncEngine, database.syncDao(), settings)
     }
 
     val placeLookup: PlaceLookup by lazy { PlaceLookup(this) }
@@ -71,8 +105,13 @@ class VolpApplication : Application() {
         super.onCreate()
         BackupWorker.schedule(this)
         RainAlertWorker.schedule(this)
+        SyncWorker.schedule(this)
         // 해외 결제 문자에는 원화 환산액이 없어 환율이 곧 금액 정확도다.
         applicationScope.launch { exchangeRates.refreshIfStale() }
+        // 다른 기기에서 넣은 기록을 앱을 여는 순간 따라잡는다.
+        applicationScope.launch {
+            if (settings.settings.first().autoSyncEnabled) firestoreSync.sync()
+        }
     }
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

@@ -3,6 +3,7 @@ package com.volp.travelbudget.domain.itinerary
 import com.volp.travelbudget.domain.booking.Booking
 import com.volp.travelbudget.domain.booking.BookingType
 import com.volp.travelbudget.domain.model.Region
+import com.volp.travelbudget.domain.sync.Syncable
 import com.volp.travelbudget.domain.travel.Geo
 import com.volp.travelbudget.domain.travel.GeoPoint
 import com.volp.travelbudget.domain.travel.RouteAdvisor
@@ -14,6 +15,8 @@ import java.time.LocalTime
 /** 일정표에 넣은 장소 한 곳. */
 data class ItineraryStop(
     val id: Long = 0L,
+    override val uid: String = "",
+    override val updatedAt: Long = 0L,
     val tripId: Long,
     val date: LocalDate,
     val sortOrder: Int,
@@ -23,7 +26,7 @@ data class ItineraryStop(
     /** `HH:mm`. 정하지 않았으면 null. */
     val startTime: String? = null,
     val memo: String = "",
-) {
+) : Syncable {
     val time: LocalTime?
         get() = startTime?.let { runCatching { LocalTime.parse(it) }.getOrNull() }
 }

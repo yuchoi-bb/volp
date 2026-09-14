@@ -48,6 +48,17 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/volp-release.jks"
           echo "KEYSTORE_FILE=$RUNNER_TEMP/volp-release.jks" >> "$GITHUB_ENV"
 
+      # 없으면 기기 동기화 없이 빌드된다. 앱은 BuildConfig.HAS_FIREBASE로 그 사정을 안다.
+      - name: Firebase 설정 복원
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "GOOGLE_SERVICES_JSON 시크릿이 없어 기기 동기화 없이 빌드한다." >&2
+            exit 0
+          fi
+          echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
+
       - name: 단위 테스트
         run: ./gradlew --no-daemon testReleaseUnitTest
 

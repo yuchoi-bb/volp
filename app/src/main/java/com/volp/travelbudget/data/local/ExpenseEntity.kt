@@ -1,5 +1,6 @@
 package com.volp.travelbudget.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -22,6 +23,8 @@ import java.time.LocalDate
 )
 data class ExpenseEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    @ColumnInfo(defaultValue = "") val uid: String,
+    @ColumnInfo(defaultValue = "0") val updatedAt: Long,
     val tripId: Long,
     val category: String,
     val amountKrw: Long,
@@ -35,6 +38,8 @@ data class ExpenseEntity(
 
 fun ExpenseEntity.toDomain(): Expense = Expense(
     id = id,
+    uid = uid,
+    updatedAt = updatedAt,
     tripId = tripId,
     category = ExpenseCategory.fromName(category),
     amountKrw = amountKrw,
@@ -48,6 +53,8 @@ fun ExpenseEntity.toDomain(): Expense = Expense(
 
 fun Expense.toEntity(): ExpenseEntity = ExpenseEntity(
     id = id,
+    uid = uid,
+    updatedAt = updatedAt,
     tripId = tripId,
     category = category.name,
     amountKrw = amountKrw,

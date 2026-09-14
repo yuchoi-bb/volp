@@ -47,6 +47,29 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!--
+            주문·배송 문자를 공유하거나 글을 블록으로 잡아 넘기면 구매 기록으로 받는다.
+            SEND는 공유 시트에서, PROCESS_TEXT는 글을 길게 눌렀을 때의 메뉴에서 들어온다.
+        -->
+        <activity
+            android:name=".ui.share.ShareCaptureActivity"
+            android:exported="true"
+            android:label="@string/share_target_label"
+            android:excludeFromRecents="true"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.Volp">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <!-- 지도 키. 저장소에는 넣지 않고 빌드할 때 채운다. -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
