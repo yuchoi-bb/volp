@@ -35,6 +35,10 @@ GitHub 릴리스로 올린다. 태그는 `v<versionName>` 형식이고 마지막
 릴리스 키로 로컬에서 빌드하려면 `keystore.properties`에 `storeFile`, `storePassword`,
 `keyAlias`, `keyPassword`를 적는다. 이 파일은 저장소에 올리지 않는다.
 
+## Google Drive 백업
+
+한 번만 해 두면 되는 Google Cloud Console 설정은 [docs/google-setup.md](docs/google-setup.md)에 정리했다.
+
 ## 구조
 
 ```
