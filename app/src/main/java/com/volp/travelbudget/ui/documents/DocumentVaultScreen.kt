@@ -344,7 +344,11 @@ private fun DocumentEditorDialog(
                     }
                     if (hasExpiry) {
                         Spacer(Modifier.height(8.dp))
-                        DateField("만료일", expiresOn) { expiresOn = it }
+                        DateField(
+                            label = "만료일",
+                            date = expiresOn,
+                            onDateChange = { expiresOn = it },
+                        )
                     }
                 }
 
