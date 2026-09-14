@@ -21,6 +21,7 @@ import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.ui.expense.ExpenseEditorScreen
 import com.volp.travelbudget.ui.inbox.InboxScreen
 import com.volp.travelbudget.ui.newtrip.NewTripScreen
+import com.volp.travelbudget.ui.photos.TripPhotosScreen
 import com.volp.travelbudget.ui.settings.SettingsScreen
 import com.volp.travelbudget.ui.trip.TripDetailScreen
 import com.volp.travelbudget.ui.trips.TripListScreen
@@ -35,10 +36,12 @@ object Routes {
 
     fun tripDetail(tripId: Long) = "trips/$tripId"
     fun budgetEdit(tripId: Long) = "trips/$tripId/budget"
+    fun photos(tripId: Long) = "trips/$tripId/photos"
     fun expenseEditor(tripId: Long, expenseId: Long = 0L) = "trips/$tripId/expense?expenseId=$expenseId"
 
     const val TRIP_DETAIL_PATTERN = "trips/{tripId}"
     const val BUDGET_EDIT_PATTERN = "trips/{tripId}/budget"
+    const val PHOTOS_PATTERN = "trips/{tripId}/photos"
     const val EXPENSE_EDITOR_PATTERN = "trips/{tripId}/expense?expenseId={expenseId}"
 }
 
@@ -103,6 +106,7 @@ fun VolpApp(
                         navController.navigate(Routes.expenseEditor(tripId, expenseId))
                     },
                     onEditBudget = { navController.navigate(Routes.budgetEdit(tripId)) },
+                    onOpenPhotos = { navController.navigate(Routes.photos(tripId)) },
                     onDeleted = { navController.popBackStack() },
                 )
             }
@@ -131,6 +135,16 @@ fun VolpApp(
                 BudgetEditScreen(
                     tripId = entry.arguments?.getLong("tripId") ?: 0L,
                     onDone = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Routes.PHOTOS_PATTERN,
+                arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
+            ) { entry ->
+                TripPhotosScreen(
+                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
+                    onBack = { navController.popBackStack() },
                 )
             }
 

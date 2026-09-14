@@ -21,6 +21,9 @@ interface ExpenseDao {
     @Query("SELECT * FROM expenses WHERE id = :expenseId")
     suspend fun findById(expenseId: Long): ExpenseEntity?
 
+    @Query("SELECT * FROM expenses WHERE tripId = :tripId ORDER BY date")
+    suspend fun findByTrip(tripId: Long): List<ExpenseEntity>
+
     @Query(
         "SELECT category, SUM(amountKrw) AS total FROM expenses " +
             "WHERE tripId = :tripId GROUP BY category",

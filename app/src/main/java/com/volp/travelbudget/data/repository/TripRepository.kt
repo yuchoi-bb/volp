@@ -1,5 +1,6 @@
 package com.volp.travelbudget.data.repository
 
+import com.volp.travelbudget.data.backup.TripBackup
 import com.volp.travelbudget.data.local.CaptureSource
 import com.volp.travelbudget.data.local.ExpenseDao
 import com.volp.travelbudget.data.local.PendingStatus
@@ -150,5 +151,35 @@ class TripRepository(
 
     suspend fun ignorePending(pendingId: Long) {
         pendingDao.updateStatus(pendingId, PendingStatus.IGNORED.name, null, null)
+    }
+
+    // ---- 백업 ----
+
+    /** 백업에 담을 전체 기록. */
+    suspend fun exportAll(): List<TripBackup> =
+        tripDao.findAll().map { entity ->
+            TripBackup(
+                trip = entity.toDomain(),
+                expenses = expenseDao.findByTrip(entity.id).map { it.toDomain() },
+            )
+        }
+
+    /**
+     * 백업으로 기존 기록을 덮어쓴다.
+     *
+     * 합치기가 아니라 통째로 교체한다. 혼자 쓰는 앱이라 기기를 바꿨을 때 되살리는 용도가
+     * 대부분이고, 합치기는 같은 지출이 두 번 들어가기 쉽다.
+     *
+     * @return 복원한 여행 수
+     */
+    suspend fun importAll(backups: List<TripBackup>): Int {
+        tripDao.deleteAll()
+        backups.forEach { backup ->
+            val tripId = tripDao.insert(backup.trip.copy(id = 0L).toEntity())
+            backup.expenses.forEach { expense ->
+                expenseDao.insert(expense.copy(id = 0L, tripId = tripId).toEntity())
+            }
+        }
+        return backups.size
     }
 }

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -64,6 +65,7 @@ fun TripDetailScreen(
     onAddExpense: () -> Unit,
     onEditExpense: (Long) -> Unit,
     onEditBudget: () -> Unit,
+    onOpenPhotos: () -> Unit,
     onDeleted: () -> Unit,
 ) {
     val viewModel: TripDetailViewModel = viewModel(
@@ -86,6 +88,9 @@ fun TripDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenPhotos) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = "여행 사진")
+                    }
                     IconButton(onClick = onEditBudget) {
                         Icon(Icons.Default.Edit, contentDescription = "예산 조정")
                     }

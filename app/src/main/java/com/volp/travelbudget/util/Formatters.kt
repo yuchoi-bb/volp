@@ -60,3 +60,12 @@ fun formatBytes(bytes: Long): String = when {
 /** "9.14 (월) 14:08" */
 fun formatDateTime(value: java.time.LocalDateTime): String =
     "${formatDateWithDay(value.toLocalDate())} ${value.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+
+/** 백업 시각처럼 epoch millis로 들고 있는 값을 보여 줄 때. */
+fun formatTimestamp(millis: Long): String {
+    if (millis <= 0L) return "아직 없음"
+    val value = java.time.Instant.ofEpochMilli(millis)
+        .atZone(java.time.ZoneId.systemDefault())
+        .toLocalDateTime()
+    return "${formatDate(value.toLocalDate())} ${value.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+}

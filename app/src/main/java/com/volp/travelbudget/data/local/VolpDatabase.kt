@@ -9,8 +9,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [TripEntity::class, ExpenseEntity::class, PendingTransactionEntity::class],
-    version = 2,
+    entities = [
+        TripEntity::class,
+        ExpenseEntity::class,
+        PendingTransactionEntity::class,
+        TripPhotoEntity::class,
+    ],
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -21,6 +26,8 @@ abstract class VolpDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
 
     abstract fun pendingTransactionDao(): PendingTransactionDao
+
+    abstract fun tripPhotoDao(): TripPhotoDao
 
     companion object {
         private const val DATABASE_NAME = "volp.db"
@@ -64,6 +71,27 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        /** 여행 사진을 붙일 수 있게 한 버전. */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `trip_photos` (
+                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        `tripId` INTEGER NOT NULL,
+                        `expenseId` INTEGER,
+                        `filePath` TEXT NOT NULL,
+                        `takenAt` INTEGER NOT NULL,
+                        `note` TEXT NOT NULL,
+                        FOREIGN KEY(`tripId`) REFERENCES `trips`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_trip_photos_tripId` ON `trip_photos` (`tripId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_trip_photos_expenseId` ON `trip_photos` (`expenseId`)")
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -74,7 +102,7 @@ abstract class VolpDatabase : RoomDatabase() {
 
         private fun build(context: Context): VolpDatabase =
             Room.databaseBuilder(context, VolpDatabase::class.java, DATABASE_NAME)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }
