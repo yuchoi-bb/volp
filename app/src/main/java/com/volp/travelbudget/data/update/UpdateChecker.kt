@@ -138,10 +138,16 @@ class UpdateChecker(
             .filter { it.optString("name").endsWith(".apk", ignoreCase = true) }
             .filter { it.optString("browser_download_url").isNotBlank() }
 
-        // 한 릴리스에 빌드가 둘 올라간다. 지금 깔린 것과 같은 갈래를 고르지 않으면
-        // 권한이 다른 앱으로 갈아타게 된다.
-        val mine = apks.firstOrNull {
-            it.optString("name").contains("-${BuildConfig.FLAVOR}-", ignoreCase = true)
+        // 한 릴리스에 빌드가 둘 올라간다. 지금 깔린 것과 같은 갈래를 고르지 않으면 권한이 다른
+        // 앱으로 갈아타게 된다. 자동 수집판만 이름에 표시가 있고, 안전판은 예전과 같은 이름을
+        // 쓴다. 갈래를 모르던 옛 버전이 첫 APK를 집어 가도 안전판이 잡히게 하기 위해서다.
+        val mine = apks.firstOrNull { asset ->
+            val name = asset.optString("name")
+            if (BuildConfig.CAN_CAPTURE) {
+                name.contains(FULL_MARKER, ignoreCase = true)
+            } else {
+                !name.contains(FULL_MARKER, ignoreCase = true)
+            }
         }
         val asset = mine ?: apks.firstOrNull() ?: return null
 
@@ -157,6 +163,9 @@ class UpdateChecker(
 
     companion object {
         private const val DOWNLOAD_BUFFER = 16 * 1024
+
+        /** 자동 수집판 APK 이름에 붙는 표시. 안전판에는 아무 표시도 붙이지 않는다. */
+        private const val FULL_MARKER = "-full-"
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)

@@ -77,9 +77,11 @@ jobs:
         run: |
           SAFE=$(find app/build/outputs/apk/safe/release -name '*.apk' | head -n 1)
           FULL=$(find app/build/outputs/apk/full/release -name '*.apk' | head -n 1)
-          cp "$SAFE" "volp-safe-${VERSION_NAME}.apk"
+          # 안전판이 예전과 같은 이름을 쓴다. 갈래를 모르던 옛 버전이 첫 APK를 집어 가도
+          # 자동 수집판이 아니라 안전판이 잡히게 하려는 것이다.
+          cp "$SAFE" "volp-${VERSION_NAME}.apk"
           cp "$FULL" "volp-full-${VERSION_NAME}.apk"
-          echo "safe=volp-safe-${VERSION_NAME}.apk" >> "$GITHUB_OUTPUT"
+          echo "safe=volp-${VERSION_NAME}.apk" >> "$GITHUB_OUTPUT"
           echo "full=volp-full-${VERSION_NAME}.apk" >> "$GITHUB_OUTPUT"
 
       - name: 빌드 결과 보관
@@ -105,11 +107,11 @@ jobs:
           cat > release-notes.md <<'NOTES'
           ### 어느 것을 받아야 하나
 
-          **volp-safe** — 평소 쓰는 빌드. 문자·알림 읽기와 앱 설치 권한이 없어 그냥 설치된다.
-          카드 결제는 결제 문자를 길게 눌러 Volp로 공유하면 들어온다.
+          **volp-<버전>.apk** — 평소 쓰는 안전판. 문자·알림 읽기와 앱 설치 권한이 없어 그냥
+          설치된다. 카드 결제는 결제 문자를 길게 눌러 Volp로 공유하면 들어온다.
 
-          **volp-full** — 카드 문자와 알림을 저절로 모으는 빌드. 권한 지문이 보이스피싱 앱과
-          같아 기기가 설치를 막으므로 PC에서 `adb install -r <파일>`로 넣어야 한다.
+          **volp-full-<버전>.apk** — 카드 문자와 알림을 저절로 모으는 빌드. 권한 지문이
+          보이스피싱 앱과 같아 기기가 설치를 막으므로 PC에서 `adb install -r <파일>`로 넣어야 한다.
 
           둘은 서명과 패키지가 같아 서로 덮어써도 기록이 그대로 이어진다.
           NOTES
