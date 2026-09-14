@@ -1,0 +1,134 @@
+package com.volp.travelbudget.ui
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.volp.travelbudget.data.settings.AppSettings
+import com.volp.travelbudget.data.update.UpdateChecker
+import com.volp.travelbudget.ui.budget.BudgetEditScreen
+import com.volp.travelbudget.ui.common.volpViewModelFactory
+import com.volp.travelbudget.ui.expense.ExpenseEditorScreen
+import com.volp.travelbudget.ui.newtrip.NewTripScreen
+import com.volp.travelbudget.ui.settings.SettingsScreen
+import com.volp.travelbudget.ui.trip.TripDetailScreen
+import com.volp.travelbudget.ui.trips.TripListScreen
+import com.volp.travelbudget.ui.update.UpdatePrompt
+import com.volp.travelbudget.ui.update.UpdateViewModel
+
+object Routes {
+    const val TRIPS = "trips"
+    const val NEW_TRIP = "trips/new"
+    const val SETTINGS = "settings"
+
+    fun tripDetail(tripId: Long) = "trips/$tripId"
+    fun budgetEdit(tripId: Long) = "trips/$tripId/budget"
+    fun expenseEditor(tripId: Long, expenseId: Long = 0L) = "trips/$tripId/expense?expenseId=$expenseId"
+
+    const val TRIP_DETAIL_PATTERN = "trips/{tripId}"
+    const val BUDGET_EDIT_PATTERN = "trips/{tripId}/budget"
+    const val EXPENSE_EDITOR_PATTERN = "trips/{tripId}/expense?expenseId={expenseId}"
+}
+
+@Composable
+fun VolpApp() {
+    val navController = rememberNavController()
+
+    val updateViewModel: UpdateViewModel = viewModel(
+        factory = volpViewModelFactory { app ->
+            UpdateViewModel(UpdateChecker(app), AppSettings(app))
+        },
+    )
+    val updateState by updateViewModel.state.collectAsStateWithLifecycle()
+
+    // 앱을 열 때마다 한 번씩(하루에 몇 번까지만) 새 빌드가 있는지 확인한다.
+    LaunchedEffect(Unit) { updateViewModel.check() }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        NavHost(navController = navController, startDestination = Routes.TRIPS) {
+            composable(Routes.TRIPS) {
+                TripListScreen(
+                    onAddTrip = { navController.navigate(Routes.NEW_TRIP) },
+                    onOpenTrip = { navController.navigate(Routes.tripDetail(it)) },
+                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                )
+            }
+
+            composable(Routes.NEW_TRIP) {
+                NewTripScreen(
+                    onBack = { navController.popBackStack() },
+                    onCreated = { tripId ->
+                        navController.popBackStack()
+                        navController.navigate(Routes.tripDetail(tripId))
+                    },
+                )
+            }
+
+            composable(
+                route = Routes.TRIP_DETAIL_PATTERN,
+                arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
+            ) { entry ->
+                val tripId = entry.arguments?.getLong("tripId") ?: 0L
+                TripDetailScreen(
+                    tripId = tripId,
+                    onBack = { navController.popBackStack() },
+                    onAddExpense = { navController.navigate(Routes.expenseEditor(tripId)) },
+                    onEditExpense = { expenseId ->
+                        navController.navigate(Routes.expenseEditor(tripId, expenseId))
+                    },
+                    onEditBudget = { navController.navigate(Routes.budgetEdit(tripId)) },
+                    onDeleted = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Routes.EXPENSE_EDITOR_PATTERN,
+                arguments = listOf(
+                    navArgument("tripId") { type = NavType.LongType },
+                    navArgument("expenseId") {
+                        type = NavType.LongType
+                        defaultValue = 0L
+                    },
+                ),
+            ) { entry ->
+                ExpenseEditorScreen(
+                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
+                    expenseId = entry.arguments?.getLong("expenseId") ?: 0L,
+                    onDone = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Routes.BUDGET_EDIT_PATTERN,
+                arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
+            ) { entry ->
+                BudgetEditScreen(
+                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
+                    onDone = { navController.popBackStack() },
+                )
+            }
+
+            composable(Routes.SETTINGS) {
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onCheckUpdate = { updateViewModel.check(manual = true) },
+                )
+            }
+        }
+
+        UpdatePrompt(state = updateState, viewModel = updateViewModel)
+    }
+}
