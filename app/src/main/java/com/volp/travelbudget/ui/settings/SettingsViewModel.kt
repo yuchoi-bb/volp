@@ -30,6 +30,10 @@ class SettingsViewModel(private val settings: AppSettings) : ViewModel() {
         viewModelScope.launch { settings.setBudgetAlertsEnabled(value) }
     }
 
+    fun setRainAlertsEnabled(value: Boolean) {
+        viewModelScope.launch { settings.setRainAlertsEnabled(value) }
+    }
+
     fun setAutoBackupEnabled(value: Boolean) {
         viewModelScope.launch { settings.setAutoBackupEnabled(value) }
     }

@@ -47,6 +47,11 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!-- 지도 키. 저장소에는 넣지 않고 빌드할 때 채운다. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${mapsApiKey}" />
+
         <!-- 카드사 결제 문자 수신. 시스템만 보낼 수 있도록 권한을 건다. -->
         <receiver
             android:name=".service.CardSmsReceiver"

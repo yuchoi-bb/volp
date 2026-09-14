@@ -24,6 +24,9 @@ val releaseKeyAlias: String? = System.getenv("KEY_ALIAS") ?: keystoreProperties.
 val releaseKeyPassword: String? = System.getenv("KEY_PASSWORD") ?: keystoreProperties.getProperty("keyPassword")
 val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() && file(releaseStoreFile).exists()
 
+val mapsApiKey: String =
+    System.getenv("MAPS_API_KEY") ?: keystoreProperties.getProperty("mapsApiKey") ?: ""
+
 android {
     namespace = "com.volp.travelbudget"
     compileSdk = 35
@@ -39,6 +42,10 @@ android {
 
         // 앱이 최신 릴리스를 확인할 저장소.
         buildConfigField("String", "UPDATE_REPO", "\"yuchoi-bb/volp\"")
+
+        // 지도 키는 저장소에 두지 않는다. CI는 시크릿으로, 로컬은 keystore.properties로 넣는다.
+        manifestPlaceholders["mapsApiKey"] = mapsApiKey
+        buildConfigField("boolean", "HAS_MAPS_KEY", mapsApiKey.isNotBlank().toString())
     }
 
     signingConfigs {
@@ -114,6 +121,8 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.play.services.auth)
     implementation(libs.play.services.location)
+    implementation(libs.play.services.maps)
+    implementation(libs.maps.compose)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.okhttp)
     implementation(libs.coil.compose)

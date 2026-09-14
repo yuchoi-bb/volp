@@ -3,6 +3,7 @@ package com.volp.travelbudget.data.weather
 import com.volp.travelbudget.data.update.UpdateChecker
 import com.volp.travelbudget.domain.travel.GeoPoint
 import com.volp.travelbudget.domain.weather.DailyForecast
+import com.volp.travelbudget.domain.weather.PrecipitationSlot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -10,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /**
  * 날씨 예보를 받아 온다.
@@ -46,6 +48,51 @@ class WeatherRepository(
                 parse(response.body?.string().orEmpty())
             }
         }.getOrDefault(emptyList())
+    }
+
+    /**
+     * 앞으로 몇 시간의 15분 단위 강수 예보.
+     *
+     * 하루 예보로는 우산을 챙길 시점을 알 수 없어 따로 받는다.
+     */
+    suspend fun precipitationSlots(
+        point: GeoPoint,
+        hours: Int = 2,
+    ): List<PrecipitationSlot> = withContext(Dispatchers.IO) {
+        val url = ENDPOINT.toHttpUrl().newBuilder()
+            .addQueryParameter("latitude", point.latitude.toString())
+            .addQueryParameter("longitude", point.longitude.toString())
+            .addQueryParameter("minutely_15", "precipitation,precipitation_probability")
+            .addQueryParameter("forecast_minutely_15", (hours * 4).toString())
+            .addQueryParameter("timezone", "auto")
+            .build()
+
+        val request = Request.Builder().url(url).build()
+        runCatching {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext emptyList()
+                parseSlots(response.body?.string().orEmpty())
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun parseSlots(body: String): List<PrecipitationSlot> {
+        if (body.isBlank()) return emptyList()
+        val block = JSONObject(body).optJSONObject("minutely_15") ?: return emptyList()
+
+        val times = block.optJSONArray("time") ?: return emptyList()
+        val precipitation = block.optJSONArray("precipitation")
+        val probability = block.optJSONArray("precipitation_probability")
+
+        return (0 until times.length()).mapNotNull { index ->
+            val at = runCatching { LocalDateTime.parse(times.getString(index)) }.getOrNull()
+                ?: return@mapNotNull null
+            PrecipitationSlot(
+                at = at,
+                probability = probability?.optDouble(index)?.takeIf { !it.isNaN() }?.toInt(),
+                millimeters = precipitation?.optDouble(index)?.takeIf { !it.isNaN() } ?: 0.0,
+            )
+        }
     }
 
     private fun parse(body: String): List<DailyForecast> {

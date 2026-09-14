@@ -149,6 +149,21 @@ fun SettingsScreen(
                 )
             }
 
+            SectionCard("비 알림") {
+                ToggleRow(
+                    label = "한 시간 안에 비가 오면 알리기",
+                    checked = state.rainAlertsEnabled,
+                    onCheckedChange = viewModel::setRainAlertsEnabled,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "여행 기간에만 15분마다 지금 있는 곳의 강수 예보를 본다. 같은 비로 두 번 울리지 않는다. " +
+                        "위치는 예보를 받는 데만 쓰고 기기 밖으로 나가지 않는다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             SectionCard("백업") {
                 ToggleRow(
                     label = "Google Drive 자동 백업",

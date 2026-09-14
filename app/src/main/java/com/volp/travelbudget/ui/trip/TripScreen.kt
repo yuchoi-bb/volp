@@ -1,0 +1,186 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+package com.volp.travelbudget.ui.trip
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.volp.travelbudget.ui.common.volpViewModelFactory
+import com.volp.travelbudget.ui.trip.tabs.LedgerTab
+import com.volp.travelbudget.ui.trip.tabs.RecordTab
+import com.volp.travelbudget.ui.trip.tabs.ScheduleTab
+import com.volp.travelbudget.ui.trip.tabs.TodayTab
+import java.time.LocalDate
+
+private data class TripTab(val label: String, val icon: ImageVector)
+
+private val tabs = listOf(
+    TripTab("오늘", Icons.Default.Today),
+    TripTab("전체일정", Icons.AutoMirrored.Filled.List),
+    TripTab("가계부", Icons.Default.Payments),
+    TripTab("기록", Icons.Default.PhotoLibrary),
+)
+
+/**
+ * 여행 하나를 여는 화면. 네 갈래가 하단 탭으로 붙는다.
+ *
+ * 가계부는 그중 하나다. 여행에서 남기는 것 가운데 돈이 한 갈래일 뿐이라는 것을 구조로 보인다.
+ */
+@Composable
+fun TripScreen(
+    tripId: Long,
+    onBack: () -> Unit,
+    onAddExpense: () -> Unit,
+    onEditExpense: (Long) -> Unit,
+    onQuickExpense: () -> Unit,
+    onEditBudget: () -> Unit,
+    onOpenStats: () -> Unit,
+    onAddBooking: (LocalDate) -> Unit,
+    onEditBooking: (Long) -> Unit,
+    onDeleted: () -> Unit,
+    startTab: Int = 0,
+) {
+    val viewModel: TripViewModel = viewModel(
+        key = "trip-$tripId",
+        factory = volpViewModelFactory { app ->
+            TripViewModel(
+                repository = app.repository,
+                itineraryRepository = app.itineraryRepository,
+                bookingRepository = app.bookingRepository,
+                photoStore = app.photoStore,
+                placeLookup = app.placeLookup,
+                locationProvider = app.locationProvider,
+                weatherRepository = app.weatherRepository,
+                tripId = tripId,
+            )
+        },
+    )
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    var selectedTab by remember { mutableIntStateOf(startTab.coerceIn(0, tabs.lastIndex)) }
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(state.trip?.title ?: "여행") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = viewModel::refreshLocation) {
+                        Icon(Icons.Default.MyLocation, contentDescription = "현재 위치 확인")
+                    }
+                    IconButton(onClick = { confirmDelete = true }) {
+                        Icon(Icons.Default.Delete, contentDescription = "여행 삭제")
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            NavigationBar {
+                tabs.forEachIndexed { index, tab ->
+                    NavigationBarItem(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        icon = { Icon(tab.icon, contentDescription = null) },
+                        label = { Text(tab.label) },
+                    )
+                }
+            }
+        },
+    ) { padding ->
+        if (state.trip == null) {
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Text("불러오는 중…")
+            }
+            return@Scaffold
+        }
+
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            when (selectedTab) {
+                0 -> TodayTab(
+                    state = state,
+                    onRefreshLocation = viewModel::refreshLocation,
+                    onQuickExpense = onQuickExpense,
+                )
+
+                1 -> ScheduleTab(
+                    state = state,
+                    onAddStop = viewModel::addStop,
+                    onDeleteStop = viewModel::deleteStop,
+                    onMoveStop = viewModel::moveStop,
+                    onAddBooking = onAddBooking,
+                    onEditBooking = onEditBooking,
+                )
+
+                2 -> LedgerTab(
+                    state = state,
+                    onAddExpense = onAddExpense,
+                    onEditExpense = onEditExpense,
+                    onDeleteExpense = viewModel::deleteExpense,
+                    onEditBudget = onEditBudget,
+                    onOpenStats = onOpenStats,
+                    onApplySettlement = viewModel::applySettlement,
+                )
+
+                else -> RecordTab(
+                    state = state,
+                    onLoadDevicePhotos = viewModel::loadDevicePhotos,
+                    onAttachPhotos = viewModel::attachPhotos,
+                    onSaveNote = viewModel::saveNote,
+                    onTogglePacking = viewModel::togglePacking,
+                )
+            }
+        }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("여행을 삭제할까요") },
+            text = { Text("이 여행에 남긴 일정·지출·사진이 함께 지워진다. 되돌릴 수 없다.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmDelete = false
+                        viewModel.deleteTrip(onDeleted)
+                    },
+                ) { Text("삭제") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("취소") }
+            },
+        )
+    }
+}

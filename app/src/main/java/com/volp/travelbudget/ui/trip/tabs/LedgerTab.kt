@@ -1,10 +1,7 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
-package com.volp.travelbudget.ui.trip
+package com.volp.travelbudget.ui.trip.tabs
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,27 +13,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,8 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.summary.CategoryProgress
 import com.volp.travelbudget.domain.summary.TripSummary
@@ -56,166 +39,102 @@ import com.volp.travelbudget.ui.common.LabeledRow
 import com.volp.travelbudget.ui.common.NumberField
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.StatTile
-import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.ui.theme.BudgetColors
-import com.volp.travelbudget.util.formatDateRange
+import com.volp.travelbudget.ui.trip.TripUiState
 import com.volp.travelbudget.util.formatDateWithDay
 import com.volp.travelbudget.util.formatForeign
 import com.volp.travelbudget.util.formatKrw
 import com.volp.travelbudget.util.formatKrwShort
 import com.volp.travelbudget.util.formatSignedKrw
 
+/**
+ * 예산과 지출. 여행 기록의 한 갈래로 들어온다.
+ */
 @Composable
-fun TripDetailScreen(
-    tripId: Long,
-    onBack: () -> Unit,
+fun LedgerTab(
+    state: TripUiState,
     onAddExpense: () -> Unit,
-    onQuickExpense: () -> Unit,
     onEditExpense: (Long) -> Unit,
+    onDeleteExpense: (Long) -> Unit,
     onEditBudget: () -> Unit,
-    onOpenPhotos: () -> Unit,
     onOpenStats: () -> Unit,
-    onOpenPlan: () -> Unit,
-    onDeleted: () -> Unit,
+    onApplySettlement: (Long?) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val viewModel: TripDetailViewModel = viewModel(
-        key = "trip-$tripId",
-        factory = volpViewModelFactory { TripDetailViewModel(it.repository, tripId) },
-    )
-    val summary by viewModel.summary.collectAsStateWithLifecycle()
-    val expenses by viewModel.expenses.collectAsStateWithLifecycle()
-    val foreignApproved by viewModel.foreignApproved.collectAsStateWithLifecycle()
-    var confirmDelete by remember { mutableStateOf(false) }
+    val summary = state.summary ?: return
     var editingSettlement by remember { mutableStateOf(false) }
 
-    val current = summary
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item { SummaryCard(summary) }
+        item { CategoryCard(summary) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(current?.trip?.title ?: "여행") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onOpenPlan) {
-                        Icon(Icons.Default.Map, contentDescription = "일정과 준비물")
-                    }
-                    IconButton(onClick = onOpenStats) {
-                        Icon(Icons.Default.BarChart, contentDescription = "통계")
-                    }
-                    IconButton(onClick = onOpenPhotos) {
-                        Icon(Icons.Default.PhotoLibrary, contentDescription = "여행 사진")
-                    }
-                    IconButton(onClick = onEditBudget) {
-                        Icon(Icons.Default.Edit, contentDescription = "예산 조정")
-                    }
-                    IconButton(onClick = { confirmDelete = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "여행 삭제")
-                    }
-                },
-            )
-        },
-        floatingActionButton = {
-            // 여행 중에는 현금 입력이 가장 잦아 큰 버튼을 준다.
-            Column(horizontalAlignment = Alignment.End) {
-                SmallFloatingActionButton(onClick = onAddExpense) {
-                    Icon(Icons.Default.Add, contentDescription = "지출 자세히 입력")
-                }
-                Spacer(Modifier.height(12.dp))
-                ExtendedFloatingActionButton(
-                    onClick = onQuickExpense,
-                    icon = { Icon(Icons.Default.Bolt, contentDescription = null) },
-                    text = { Text("빠른 입력") },
+        if (state.foreignApproved > 0L) {
+            item {
+                SettlementCard(
+                    billedTotalKrw = summary.trip.billedTotalKrw,
+                    settlementFactor = summary.trip.settlementFactor,
+                    approvedForeign = state.foreignApproved,
+                    onEdit = { editingSettlement = true },
+                    onClear = { onApplySettlement(null) },
                 )
             }
-        },
-    ) { padding ->
-        if (current == null) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("불러오는 중…")
-            }
-            return@Scaffold
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item { SummaryCard(current) }
-            item { CategoryCard(current) }
-
-            if (foreignApproved > 0L) {
-                item {
-                    SettlementCard(
-                        trip = current.trip,
-                        approvedForeign = foreignApproved,
-                        onEdit = { editingSettlement = true },
-                        onClear = { viewModel.applySettlement(null) },
-                    )
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onEditBudget, modifier = Modifier.weight(1f)) {
+                    Text("예산 조정")
+                }
+                OutlinedButton(onClick = onOpenStats, modifier = Modifier.weight(1f)) {
+                    Text("통계")
                 }
             }
+        }
 
+        item {
+            Text("지출 내역 ${state.expenses.size}건", style = MaterialTheme.typography.titleMedium)
+        }
+
+        if (state.expenses.isEmpty()) {
             item {
                 Text(
-                    "지출 내역 ${expenses.size}건",
-                    style = MaterialTheme.typography.titleMedium,
+                    "아직 입력한 지출이 없다.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-
-            if (expenses.isEmpty()) {
-                item {
-                    Text(
-                        "아직 입력한 지출이 없다. + 를 눌러 기록해 보세요.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            items(expenses, key = { it.id }) { expense ->
-                ExpenseRow(
-                    expense = expense,
-                    onClick = { onEditExpense(expense.id) },
-                    onDelete = { viewModel.deleteExpense(expense.id) },
-                )
-                HorizontalDivider()
-            }
-
-            item { Spacer(Modifier.height(64.dp)) }
         }
+
+        items(state.expenses, key = { it.id }) { expense ->
+            ExpenseRow(
+                expense = expense,
+                onClick = { onEditExpense(expense.id) },
+                onDelete = { onDeleteExpense(expense.id) },
+            )
+            HorizontalDivider()
+        }
+
+        item {
+            OutlinedButton(onClick = onAddExpense, modifier = Modifier.fillMaxWidth()) {
+                Text("지출 자세히 입력")
+            }
+        }
+
+        item { Spacer(Modifier.height(72.dp)) }
     }
 
     if (editingSettlement) {
         SettlementDialog(
-            approvedForeign = foreignApproved,
-            current = current?.trip?.billedTotalKrw,
+            approvedForeign = state.foreignApproved,
+            current = summary.trip.billedTotalKrw,
             onDismiss = { editingSettlement = false },
             onApply = {
-                viewModel.applySettlement(it)
+                onApplySettlement(it)
                 editingSettlement = false
-            },
-        )
-    }
-
-    if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("여행을 삭제할까요") },
-            text = { Text("이 여행에 기록한 지출도 함께 지워진다. 되돌릴 수 없다.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmDelete = false
-                        viewModel.deleteTrip(onDeleted)
-                    },
-                ) { Text("삭제") }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("취소") }
             },
         )
     }
@@ -223,15 +142,7 @@ fun TripDetailScreen(
 
 @Composable
 private fun SummaryCard(summary: TripSummary) {
-    val trip = summary.trip
     SectionCard {
-        Text(
-            formatDateRange(trip.startDate, trip.endDate, trip.nights),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(12.dp))
-
         Text(
             formatKrw(summary.totalSpent),
             style = MaterialTheme.typography.headlineMedium,
@@ -259,7 +170,7 @@ private fun SummaryCard(summary: TripSummary) {
                 hint = "항공·숙박 제외",
             )
             StatTile(
-                label = "하루 쓸 수 있는 돈",
+                label = "오늘 쓸 수 있는 돈",
                 value = summary.dailyAllowance?.let { formatKrwShort(it) } ?: "-",
                 hint = if (summary.remainingDays > 0) "${summary.remainingDays}일 남음" else "여행 종료",
             )
@@ -324,57 +235,9 @@ private fun CategoryRow(progress: CategoryProgress) {
 }
 
 @Composable
-private fun ExpenseRow(
-    expense: Expense,
-    onClick: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                expense.memo.ifBlank { expense.category.label },
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                "${formatDateWithDay(expense.date)} · ${expense.category.emoji} ${expense.category.label}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                formatKrw(expense.amountKrw),
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (expense.amountKrw < 0L) BudgetColors.under else MaterialTheme.colorScheme.onSurface,
-            )
-            if (expense.enteredInForeignCurrency) {
-                Text(
-                    formatForeign(expense.originalAmount ?: 0.0, expense.currencyCode),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Delete, contentDescription = "지출 삭제")
-        }
-    }
-}
-
-/**
- * 카드 문자에 오는 것은 승인액이고 실제 청구는 해외이용수수료와 확정 환율 때문에 조금 다르다.
- * 명세서가 나오면 총액을 한 번 넣어 건별로 맞춘다.
- */
-@Composable
 private fun SettlementCard(
-    trip: com.volp.travelbudget.domain.model.Trip,
+    billedTotalKrw: Long?,
+    settlementFactor: Double,
     approvedForeign: Long,
     onEdit: () -> Unit,
     onClear: () -> Unit,
@@ -383,9 +246,7 @@ private fun SettlementCard(
         LabeledRow("승인액 합계", formatKrw(approvedForeign))
         Spacer(Modifier.height(6.dp))
 
-        val billed = trip.billedTotalKrw
-        if (billed == null) {
-            Spacer(Modifier.height(6.dp))
+        if (billedTotalKrw == null) {
             Text(
                 "명세서에 찍힌 해외 결제 총액을 넣으면 수수료와 확정 환율만큼 건별로 맞춰 준다.",
                 style = MaterialTheme.typography.bodySmall,
@@ -396,9 +257,9 @@ private fun SettlementCard(
                 Text("실제 청구액 넣기")
             }
         } else {
-            LabeledRow("실제 청구액", formatKrw(billed))
+            LabeledRow("실제 청구액", formatKrw(billedTotalKrw))
             Spacer(Modifier.height(6.dp))
-            val percent = (trip.settlementFactor - 1.0) * 100
+            val percent = (settlementFactor - 1.0) * 100
             LabeledRow(
                 label = "차이",
                 value = String.format(java.util.Locale.KOREA, "%+.1f%%", percent),
@@ -449,4 +310,49 @@ private fun SettlementDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
     )
+}
+
+@Composable
+private fun ExpenseRow(
+    expense: Expense,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                expense.memo.ifBlank { expense.category.label },
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                "${formatDateWithDay(expense.date)} · ${expense.category.emoji} ${expense.category.label}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                formatKrw(expense.amountKrw),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (expense.amountKrw < 0L) BudgetColors.under else MaterialTheme.colorScheme.onSurface,
+            )
+            if (expense.enteredInForeignCurrency) {
+                Text(
+                    formatForeign(expense.originalAmount ?: 0.0, expense.currencyCode),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Default.Delete, contentDescription = "지출 삭제")
+        }
+    }
 }

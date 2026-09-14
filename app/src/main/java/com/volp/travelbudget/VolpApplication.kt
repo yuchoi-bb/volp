@@ -2,11 +2,13 @@ package com.volp.travelbudget
 
 import android.app.Application
 import com.volp.travelbudget.data.alert.BudgetAlertNotifier
+import com.volp.travelbudget.data.alert.RainAlertWorker
 import com.volp.travelbudget.data.backup.BackupWorker
 import com.volp.travelbudget.data.capture.CardCaptureHandler
 import com.volp.travelbudget.data.exchange.ExchangeRateRepository
 import com.volp.travelbudget.data.local.VolpDatabase
 import com.volp.travelbudget.data.photos.PhotoStore
+import com.volp.travelbudget.data.repository.BookingRepository
 import com.volp.travelbudget.data.repository.ItineraryRepository
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.travel.LocationProvider
@@ -47,6 +49,10 @@ class VolpApplication : Application() {
         ItineraryRepository(database.itineraryDao())
     }
 
+    val bookingRepository: BookingRepository by lazy {
+        BookingRepository(database.bookingDao())
+    }
+
     val placeLookup: PlaceLookup by lazy { PlaceLookup(this) }
 
     val locationProvider: LocationProvider by lazy { LocationProvider(this) }
@@ -64,6 +70,7 @@ class VolpApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         BackupWorker.schedule(this)
+        RainAlertWorker.schedule(this)
         // 해외 결제 문자에는 원화 환산액이 없어 환율이 곧 금액 정확도다.
         applicationScope.launch { exchangeRates.refreshIfStale() }
     }

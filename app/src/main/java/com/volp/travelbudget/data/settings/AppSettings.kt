@@ -24,6 +24,10 @@ data class VolpSettings(
     val autoAssignEnabled: Boolean = true,
     /** 예산을 넘겼거나 넘길 것 같을 때 알려 줄지. */
     val budgetAlertsEnabled: Boolean = true,
+    /** 한 시간 안에 비가 오면 알려 줄지. */
+    val rainAlertsEnabled: Boolean = true,
+    /** 마지막으로 알린 비가 시작되는 시각. 같은 비로 두 번 울리지 않게 기억한다. */
+    val lastRainAlertFor: String = "",
     /** Drive 자동 백업을 켤지. */
     val autoBackupEnabled: Boolean = true,
     /** 마지막으로 백업에 성공한 시각(epoch millis). 0이면 아직 없다. */
@@ -43,6 +47,8 @@ class AppSettings(private val context: Context) {
         val captureEnabled = booleanPreferencesKey("capture_enabled")
         val autoAssignEnabled = booleanPreferencesKey("auto_assign_enabled")
         val budgetAlertsEnabled = booleanPreferencesKey("budget_alerts_enabled")
+        val rainAlertsEnabled = booleanPreferencesKey("rain_alerts_enabled")
+        val lastRainAlertFor = stringPreferencesKey("last_rain_alert_for")
         val autoBackupEnabled = booleanPreferencesKey("auto_backup_enabled")
         val lastBackupAt = longPreferencesKey("last_backup_at")
         val driveFolderId = stringPreferencesKey("drive_folder_id")
@@ -56,6 +62,8 @@ class AppSettings(private val context: Context) {
             captureEnabled = prefs[Keys.captureEnabled] ?: true,
             autoAssignEnabled = prefs[Keys.autoAssignEnabled] ?: true,
             budgetAlertsEnabled = prefs[Keys.budgetAlertsEnabled] ?: true,
+            rainAlertsEnabled = prefs[Keys.rainAlertsEnabled] ?: true,
+            lastRainAlertFor = prefs[Keys.lastRainAlertFor].orEmpty(),
             autoBackupEnabled = prefs[Keys.autoBackupEnabled] ?: true,
             lastBackupAt = prefs[Keys.lastBackupAt] ?: 0L,
             driveFolderId = prefs[Keys.driveFolderId],
@@ -71,6 +79,10 @@ class AppSettings(private val context: Context) {
     suspend fun setAutoAssignEnabled(value: Boolean) = edit { it[Keys.autoAssignEnabled] = value }
 
     suspend fun setBudgetAlertsEnabled(value: Boolean) = edit { it[Keys.budgetAlertsEnabled] = value }
+
+    suspend fun setRainAlertsEnabled(value: Boolean) = edit { it[Keys.rainAlertsEnabled] = value }
+
+    suspend fun setLastRainAlertFor(value: String) = edit { it[Keys.lastRainAlertFor] = value }
 
     suspend fun setAutoBackupEnabled(value: Boolean) = edit { it[Keys.autoBackupEnabled] = value }
 

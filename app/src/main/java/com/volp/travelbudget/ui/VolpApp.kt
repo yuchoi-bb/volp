@@ -6,6 +6,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -16,20 +19,20 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.volp.travelbudget.data.settings.AppSettings
 import com.volp.travelbudget.data.update.UpdateChecker
+import com.volp.travelbudget.ui.booking.BookingEditorScreen
 import com.volp.travelbudget.ui.budget.BudgetEditScreen
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.ui.expense.ExpenseEditorScreen
 import com.volp.travelbudget.ui.inbox.InboxScreen
 import com.volp.travelbudget.ui.newtrip.NewTripScreen
-import com.volp.travelbudget.ui.photos.TripPhotosScreen
-import com.volp.travelbudget.ui.plan.TripPlanScreen
 import com.volp.travelbudget.ui.quick.QuickExpenseScreen
 import com.volp.travelbudget.ui.settings.SettingsScreen
 import com.volp.travelbudget.ui.stats.TripStatsScreen
-import com.volp.travelbudget.ui.trip.TripDetailScreen
+import com.volp.travelbudget.ui.trip.TripScreen
 import com.volp.travelbudget.ui.trips.TripListScreen
 import com.volp.travelbudget.ui.update.UpdatePrompt
 import com.volp.travelbudget.ui.update.UpdateViewModel
+import java.time.LocalDate
 
 object Routes {
     const val TRIPS = "trips"
@@ -37,22 +40,20 @@ object Routes {
     const val SETTINGS = "settings"
     const val INBOX = "inbox"
 
-    fun quickExpense(tripId: Long = 0L) = "quick?tripId=$tripId"
-    const val QUICK_EXPENSE_PATTERN = "quick?tripId={tripId}"
-
     fun tripDetail(tripId: Long) = "trips/$tripId"
     fun budgetEdit(tripId: Long) = "trips/$tripId/budget"
-    fun photos(tripId: Long) = "trips/$tripId/photos"
     fun stats(tripId: Long) = "trips/$tripId/stats"
-    fun plan(tripId: Long) = "trips/$tripId/plan"
     fun expenseEditor(tripId: Long, expenseId: Long = 0L) = "trips/$tripId/expense?expenseId=$expenseId"
+    fun quickExpense(tripId: Long = 0L) = "quick?tripId=$tripId"
+    fun bookingEditor(tripId: Long, bookingId: Long = 0L, date: LocalDate? = null) =
+        "trips/$tripId/booking?bookingId=$bookingId&date=${date?.toString().orEmpty()}"
 
     const val TRIP_DETAIL_PATTERN = "trips/{tripId}"
     const val BUDGET_EDIT_PATTERN = "trips/{tripId}/budget"
-    const val PHOTOS_PATTERN = "trips/{tripId}/photos"
     const val STATS_PATTERN = "trips/{tripId}/stats"
-    const val PLAN_PATTERN = "trips/{tripId}/plan"
     const val EXPENSE_EDITOR_PATTERN = "trips/{tripId}/expense?expenseId={expenseId}"
+    const val QUICK_EXPENSE_PATTERN = "quick?tripId={tripId}"
+    const val BOOKING_EDITOR_PATTERN = "trips/{tripId}/booking?bookingId={bookingId}&date={date}"
 }
 
 @Composable
@@ -69,6 +70,12 @@ fun VolpApp(
     )
     val updateState by updateViewModel.state.collectAsStateWithLifecycle()
 
+    val startupViewModel: StartupViewModel = viewModel(
+        factory = volpViewModelFactory { StartupViewModel(it.repository) },
+    )
+    val startup by startupViewModel.state.collectAsStateWithLifecycle()
+    var startupHandled by remember { mutableStateOf(false) }
+
     // 앱을 열 때마다 한 번씩(하루에 몇 번까지만) 새 빌드가 있는지 확인한다.
     LaunchedEffect(Unit) { updateViewModel.check() }
 
@@ -79,7 +86,15 @@ fun VolpApp(
             StartTarget.QuickEntry -> navController.navigate(Routes.quickExpense())
             is StartTarget.Trip -> navController.navigate(Routes.tripDetail(startTarget.tripId))
         }
+        startupHandled = true
         onStartTargetHandled()
+    }
+
+    // 여행 중이면 목록을 거치지 않고 오늘 화면을 연다. 여행이 없을 때만 목록이 첫 화면이다.
+    LaunchedEffect(startup, startTarget) {
+        if (startupHandled || !startup.resolved || startTarget != StartTarget.None) return@LaunchedEffect
+        startupHandled = true
+        startup.ongoingTripId?.let { navController.navigate(Routes.tripDetail(it)) }
     }
 
     Surface(
@@ -112,19 +127,40 @@ fun VolpApp(
                 arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
             ) { entry ->
                 val tripId = entry.arguments?.getLong("tripId") ?: 0L
-                TripDetailScreen(
+                TripScreen(
                     tripId = tripId,
                     onBack = { navController.popBackStack() },
                     onAddExpense = { navController.navigate(Routes.expenseEditor(tripId)) },
+                    onEditExpense = { navController.navigate(Routes.expenseEditor(tripId, it)) },
                     onQuickExpense = { navController.navigate(Routes.quickExpense(tripId)) },
-                    onEditExpense = { expenseId ->
-                        navController.navigate(Routes.expenseEditor(tripId, expenseId))
-                    },
                     onEditBudget = { navController.navigate(Routes.budgetEdit(tripId)) },
-                    onOpenPhotos = { navController.navigate(Routes.photos(tripId)) },
                     onOpenStats = { navController.navigate(Routes.stats(tripId)) },
-                    onOpenPlan = { navController.navigate(Routes.plan(tripId)) },
+                    onAddBooking = { date -> navController.navigate(Routes.bookingEditor(tripId, date = date)) },
+                    onEditBooking = { navController.navigate(Routes.bookingEditor(tripId, bookingId = it)) },
                     onDeleted = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Routes.BOOKING_EDITOR_PATTERN,
+                arguments = listOf(
+                    navArgument("tripId") { type = NavType.LongType },
+                    navArgument("bookingId") {
+                        type = NavType.LongType
+                        defaultValue = 0L
+                    },
+                    navArgument("date") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) { entry ->
+                val raw = entry.arguments?.getString("date").orEmpty()
+                BookingEditorScreen(
+                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
+                    bookingId = entry.arguments?.getLong("bookingId") ?: 0L,
+                    defaultDate = runCatching { LocalDate.parse(raw) }.getOrDefault(LocalDate.now()),
+                    onDone = { navController.popBackStack() },
                 )
             }
 
@@ -156,30 +192,10 @@ fun VolpApp(
             }
 
             composable(
-                route = Routes.PHOTOS_PATTERN,
-                arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
-            ) { entry ->
-                TripPhotosScreen(
-                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
-                    onBack = { navController.popBackStack() },
-                )
-            }
-
-            composable(
                 route = Routes.STATS_PATTERN,
                 arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
             ) { entry ->
                 TripStatsScreen(
-                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
-                    onBack = { navController.popBackStack() },
-                )
-            }
-
-            composable(
-                route = Routes.PLAN_PATTERN,
-                arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
-            ) { entry ->
-                TripPlanScreen(
                     tripId = entry.arguments?.getLong("tripId") ?: 0L,
                     onBack = { navController.popBackStack() },
                 )

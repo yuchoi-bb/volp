@@ -19,8 +19,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ItineraryStopEntity::class,
         PackingCheckEntity::class,
         BudgetAlertEntity::class,
+        BookingEntity::class,
+        DayNoteEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -41,6 +43,8 @@ abstract class VolpDatabase : RoomDatabase() {
     abstract fun itineraryDao(): ItineraryDao
 
     abstract fun budgetAlertDao(): BudgetAlertDao
+
+    abstract fun bookingDao(): BookingDao
 
     companion object {
         private const val DATABASE_NAME = "volp.db"
@@ -193,6 +197,51 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        /** 항공·숙소 같은 예약과 하루 메모를 더한 버전. */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `bookings` (
+                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        `tripId` INTEGER NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `provider` TEXT NOT NULL,
+                        `confirmationCode` TEXT NOT NULL,
+                        `startAt` TEXT NOT NULL,
+                        `endAt` TEXT,
+                        `fromName` TEXT NOT NULL,
+                        `fromCode` TEXT NOT NULL,
+                        `toName` TEXT NOT NULL,
+                        `toCode` TEXT NOT NULL,
+                        `address` TEXT NOT NULL,
+                        `seat` TEXT NOT NULL,
+                        `gate` TEXT NOT NULL,
+                        `terminal` TEXT NOT NULL,
+                        `memo` TEXT NOT NULL,
+                        `latitude` REAL,
+                        `longitude` REAL,
+                        FOREIGN KEY(`tripId`) REFERENCES `trips`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bookings_tripId` ON `bookings` (`tripId`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `day_notes` (
+                        `tripId` INTEGER NOT NULL,
+                        `date` TEXT NOT NULL,
+                        `text` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`tripId`, `date`),
+                        FOREIGN KEY(`tripId`) REFERENCES `trips`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -210,6 +259,7 @@ abstract class VolpDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
+                    MIGRATION_7_8,
                 )
                 .build()
     }
