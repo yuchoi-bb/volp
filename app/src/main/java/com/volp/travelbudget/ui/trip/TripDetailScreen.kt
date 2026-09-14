@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -69,6 +70,7 @@ fun TripDetailScreen(
     onEditExpense: (Long) -> Unit,
     onEditBudget: () -> Unit,
     onOpenPhotos: () -> Unit,
+    onOpenStats: () -> Unit,
     onDeleted: () -> Unit,
 ) {
     val viewModel: TripDetailViewModel = viewModel(
@@ -93,6 +95,9 @@ fun TripDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenStats) {
+                        Icon(Icons.Default.BarChart, contentDescription = "통계")
+                    }
                     IconButton(onClick = onOpenPhotos) {
                         Icon(Icons.Default.PhotoLibrary, contentDescription = "여행 사진")
                     }

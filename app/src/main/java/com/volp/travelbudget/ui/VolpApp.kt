@@ -23,6 +23,7 @@ import com.volp.travelbudget.ui.inbox.InboxScreen
 import com.volp.travelbudget.ui.newtrip.NewTripScreen
 import com.volp.travelbudget.ui.photos.TripPhotosScreen
 import com.volp.travelbudget.ui.settings.SettingsScreen
+import com.volp.travelbudget.ui.stats.TripStatsScreen
 import com.volp.travelbudget.ui.trip.TripDetailScreen
 import com.volp.travelbudget.ui.trips.TripListScreen
 import com.volp.travelbudget.ui.update.UpdatePrompt
@@ -37,11 +38,13 @@ object Routes {
     fun tripDetail(tripId: Long) = "trips/$tripId"
     fun budgetEdit(tripId: Long) = "trips/$tripId/budget"
     fun photos(tripId: Long) = "trips/$tripId/photos"
+    fun stats(tripId: Long) = "trips/$tripId/stats"
     fun expenseEditor(tripId: Long, expenseId: Long = 0L) = "trips/$tripId/expense?expenseId=$expenseId"
 
     const val TRIP_DETAIL_PATTERN = "trips/{tripId}"
     const val BUDGET_EDIT_PATTERN = "trips/{tripId}/budget"
     const val PHOTOS_PATTERN = "trips/{tripId}/photos"
+    const val STATS_PATTERN = "trips/{tripId}/stats"
     const val EXPENSE_EDITOR_PATTERN = "trips/{tripId}/expense?expenseId={expenseId}"
 }
 
@@ -107,6 +110,7 @@ fun VolpApp(
                     },
                     onEditBudget = { navController.navigate(Routes.budgetEdit(tripId)) },
                     onOpenPhotos = { navController.navigate(Routes.photos(tripId)) },
+                    onOpenStats = { navController.navigate(Routes.stats(tripId)) },
                     onDeleted = { navController.popBackStack() },
                 )
             }
@@ -143,6 +147,16 @@ fun VolpApp(
                 arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
             ) { entry ->
                 TripPhotosScreen(
+                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Routes.STATS_PATTERN,
+                arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
+            ) { entry ->
+                TripStatsScreen(
                     tripId = entry.arguments?.getLong("tripId") ?: 0L,
                     onBack = { navController.popBackStack() },
                 )
