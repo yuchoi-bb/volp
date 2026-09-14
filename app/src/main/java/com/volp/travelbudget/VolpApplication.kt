@@ -15,6 +15,7 @@ import com.volp.travelbudget.data.photos.PhotoStore
 import com.volp.travelbudget.data.repository.BookingRepository
 import com.volp.travelbudget.data.repository.ItineraryRepository
 import com.volp.travelbudget.data.repository.CashRepository
+import com.volp.travelbudget.data.repository.DocumentRepository
 import com.volp.travelbudget.data.repository.PurchaseRepository
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.travel.LocationProvider
@@ -89,6 +90,10 @@ class VolpApplication : Application() {
     /** 다른 안드로이드 기기와 기록을 맞춘다. */
     val firestoreSync: FirestoreSync by lazy {
         FirestoreSync(this, syncEngine, database.syncDao(), settings)
+    }
+
+    val documentRepository: DocumentRepository by lazy {
+        DocumentRepository(this, database.documentDao())
     }
 
     val cashRepository: CashRepository by lazy {

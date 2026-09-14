@@ -22,7 +22,9 @@ import com.volp.travelbudget.data.update.UpdateChecker
 import com.volp.travelbudget.ui.booking.BookingEditorScreen
 import com.volp.travelbudget.ui.budget.BudgetEditScreen
 import com.volp.travelbudget.ui.common.volpViewModelFactory
+import com.volp.travelbudget.ui.documents.DocumentVaultScreen
 import com.volp.travelbudget.ui.expense.ExpenseEditorScreen
+import com.volp.travelbudget.ui.history.PastTripsScreen
 import com.volp.travelbudget.ui.inbox.InboxScreen
 import com.volp.travelbudget.ui.newtrip.NewTripScreen
 import com.volp.travelbudget.ui.purchase.PurchaseEditorScreen
@@ -42,6 +44,8 @@ object Routes {
     const val SETTINGS = "settings"
     const val INBOX = "inbox"
     const val PURCHASES = "purchases"
+    const val DOCUMENTS = "documents"
+    const val PAST_TRIPS = "history"
 
     fun tripDetail(tripId: Long) = "trips/$tripId"
     fun budgetEdit(tripId: Long) = "trips/$tripId/budget"
@@ -116,7 +120,20 @@ fun VolpApp(
                     onOpenInbox = { navController.navigate(Routes.INBOX) },
                     onQuickExpense = { navController.navigate(Routes.quickExpense()) },
                     onOpenPurchases = { navController.navigate(Routes.PURCHASES) },
+                    onOpenDocuments = { navController.navigate(Routes.DOCUMENTS) },
+                    onOpenPastTrips = { navController.navigate(Routes.PAST_TRIPS) },
                 )
+            }
+
+            composable(Routes.PAST_TRIPS) {
+                PastTripsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTrip = { navController.navigate(Routes.tripDetail(it)) },
+                )
+            }
+
+            composable(Routes.DOCUMENTS) {
+                DocumentVaultScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Routes.PURCHASES) {

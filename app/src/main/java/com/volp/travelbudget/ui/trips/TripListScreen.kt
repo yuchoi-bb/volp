@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Settings
@@ -32,6 +33,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -61,6 +63,8 @@ fun TripListScreen(
     onOpenInbox: () -> Unit,
     onQuickExpense: () -> Unit,
     onOpenPurchases: () -> Unit,
+    onOpenDocuments: () -> Unit,
+    onOpenPastTrips: () -> Unit,
 ) {
     val viewModel: TripListViewModel = viewModel(
         factory = volpViewModelFactory { TripListViewModel(it.repository, it.settings) },
@@ -79,6 +83,9 @@ fun TripListScreen(
                     }
                     IconButton(onClick = onOpenPurchases) {
                         Icon(Icons.Default.LocalShipping, contentDescription = "구매·배송")
+                    }
+                    IconButton(onClick = onOpenDocuments) {
+                        Icon(Icons.Default.Folder, contentDescription = "문서 보관함")
                     }
                     BadgedBox(
                         badge = {
@@ -122,6 +129,20 @@ fun TripListScreen(
                 items(trips, key = { it.trip.id }) { item ->
                     TripCard(item = item, onClick = { onOpenTrip(item.trip.id) })
                 }
+
+                // 다녀온 여행이 있어야 볼 것이 있다.
+                if (trips.any { it.trip.statusOn(LocalDate.now()) == TripStatus.FINISHED }) {
+                    item(key = "past") {
+                        OutlinedButton(
+                            onClick = onOpenPastTrips,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("지난 여행에서 쓴 돈 보기")
+                        }
+                    }
+                }
+
+                item(key = "bottom") { Spacer(Modifier.height(72.dp)) }
             }
         }
     }

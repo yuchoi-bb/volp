@@ -24,8 +24,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DeletionEntity::class,
         PurchaseEntity::class,
         CashTopUpEntity::class,
+        DocumentEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -54,6 +55,8 @@ abstract class VolpDatabase : RoomDatabase() {
     abstract fun purchaseDao(): PurchaseDao
 
     abstract fun cashTopUpDao(): CashTopUpDao
+
+    abstract fun documentDao(): DocumentDao
 
     companion object {
         private const val DATABASE_NAME = "volp.db"
@@ -350,6 +353,37 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * 문서 보관함을 더한 버전.
+         *
+         * 여권·보험증서·바우처는 해외에서 데이터가 없을 때 꺼내 봐야 한다. 사진은 기기 안에 두고
+         * 표에는 그 자리만 적어 둔다.
+         */
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `documents` (
+                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        `uid` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `tripId` INTEGER,
+                        `kind` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `number` TEXT NOT NULL,
+                        `expiresOn` TEXT,
+                        `memo` TEXT NOT NULL,
+                        `filePath` TEXT,
+                        `createdAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`tripId`) REFERENCES `trips`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_documents_tripId` ON `documents` (`tripId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_documents_uid` ON `documents` (`uid`)")
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -371,6 +405,7 @@ abstract class VolpDatabase : RoomDatabase() {
                     MIGRATION_8_9,
                     MIGRATION_9_10,
                     MIGRATION_10_11,
+                    MIGRATION_11_12,
                 )
                 .build()
     }

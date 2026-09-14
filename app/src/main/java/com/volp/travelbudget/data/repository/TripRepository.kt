@@ -23,6 +23,7 @@ import com.volp.travelbudget.domain.cardsms.CardTransaction
 import com.volp.travelbudget.domain.cardsms.TransactionKind
 import com.volp.travelbudget.domain.classify.RuleBasedMerchantClassifier
 import com.volp.travelbudget.domain.budget.TripOutcome
+import com.volp.travelbudget.domain.stats.PastTrip
 import com.volp.travelbudget.domain.settlement.Settlement
 import com.volp.travelbudget.domain.sync.SyncIds
 import com.volp.travelbudget.domain.summary.TripSummaries
@@ -130,6 +131,33 @@ class TripRepository(
                 TripOutcome(endDate = trip.endDate, predicted = trip.predictedBudget, actual = actual)
             }
             .filter { it.actual.isNotEmpty() }
+
+    /**
+     * 다녀온 여행의 결산.
+     *
+     * 예측과 실제를 함께 들고 오므로 화면에서 그대로 견줄 수 있다. 끝났는지는 화면 쪽에서
+     * 오늘 날짜로 가린다.
+     */
+    suspend fun pastTrips(): List<PastTrip> =
+        tripDao.findAll().map { it.toDomain() }.map { trip ->
+            val byCategory = expenseDao.findByTrip(trip.id)
+                .map { it.toDomain() }
+                .groupBy { it.category }
+                .mapValues { (_, items) -> items.sumOf { it.amountKrw } }
+
+            PastTrip(
+                tripId = trip.id,
+                title = trip.title,
+                destinationName = trip.destinationName,
+                startDate = trip.startDate,
+                endDate = trip.endDate,
+                days = trip.days,
+                travelers = trip.travelers,
+                predictedTotal = trip.totalPredicted,
+                actualTotal = byCategory.values.sum(),
+                byCategory = byCategory,
+            )
+        }
 
     suspend fun addExpense(expense: Expense): Long = expenseDao.insert(expense.stamped().toEntity())
 
