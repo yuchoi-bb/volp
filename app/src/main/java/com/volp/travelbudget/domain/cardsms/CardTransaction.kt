@@ -20,15 +20,15 @@ enum class CardIssuer(val label: String, val senderNumbers: Set<String>) {
     }
 }
 
-enum class TransactionKind {
+enum class TransactionKind(val label: String) {
     /** 결제 승인. 가계부에 더한다. */
-    APPROVAL,
+    APPROVAL("승인"),
 
     /** 매출취소·환불. 가계부에서 뺀다. */
-    CANCEL,
+    CANCEL("취소"),
 
     /** 승인거절. 실제로 돈이 나가지 않았으므로 기록하지 않는다. */
-    DECLINED,
+    DECLINED("승인거절"),
 }
 
 /**
