@@ -66,7 +66,13 @@ fun ExpenseEditorScreen(
     val viewModel: ExpenseEditorViewModel = viewModel(
         key = "expense-$tripId-$expenseId",
         factory = volpViewModelFactory { app ->
-            ExpenseEditorViewModel(app.repository, app.photoStore, tripId, expenseId)
+            ExpenseEditorViewModel(
+                repository = app.repository,
+                photoStore = app.photoStore,
+                exchangeRates = app.exchangeRates,
+                tripId = tripId,
+                expenseId = expenseId,
+            )
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()

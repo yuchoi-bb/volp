@@ -45,7 +45,7 @@ object BackupPayload {
     }
 
     fun toCsv(backups: List<TripBackup>): String = buildString {
-        appendLine("여행,날짜,항목,금액(원),현지금액,통화,메모")
+        appendLine("여행,날짜,항목,금액(원),현지금액,통화,적용환율,메모")
         backups.forEach { backup ->
             backup.expenses.forEach { expense ->
                 appendLine(
@@ -56,6 +56,7 @@ object BackupPayload {
                         expense.amountKrw.toString(),
                         expense.originalAmount?.toString().orEmpty(),
                         expense.currencyCode,
+                        expense.exchangeRate?.toString().orEmpty(),
                         expense.memo,
                     ).joinToString(",") { escapeCsv(it) },
                 )
@@ -82,6 +83,7 @@ object BackupPayload {
                     .put("currencyCode", expense.currencyCode)
                     .put("date", expense.date.toString())
                     .put("memo", expense.memo)
+                    .put("exchangeRate", expense.exchangeRate ?: JSONObject.NULL)
                     .put("createdAt", expense.createdAt),
             )
         }
@@ -99,6 +101,8 @@ object BackupPayload {
             .put("exchangeRate", trip.exchangeRate)
             .put("predictedBudget", budgetToJson(trip.predictedBudget))
             .put("plannedBudget", budgetToJson(trip.plannedBudget))
+            .put("billedTotalKrw", trip.billedTotalKrw ?: JSONObject.NULL)
+            .put("settlementFactor", trip.settlementFactor)
             .put("createdAt", trip.createdAt)
             .put("expenses", expenses)
     }
@@ -118,6 +122,8 @@ object BackupPayload {
             exchangeRate = json.optDouble("exchangeRate", 1.0),
             predictedBudget = budgetFromJson(json.optJSONObject("predictedBudget")),
             plannedBudget = budgetFromJson(json.optJSONObject("plannedBudget")),
+            billedTotalKrw = if (json.isNull("billedTotalKrw")) null else json.optLong("billedTotalKrw"),
+            settlementFactor = json.optDouble("settlementFactor", 1.0),
             createdAt = json.optLong("createdAt", System.currentTimeMillis()),
         )
 
@@ -132,6 +138,7 @@ object BackupPayload {
                 currencyCode = item.optString("currencyCode", "KRW"),
                 date = LocalDate.parse(item.getString("date")),
                 memo = item.optString("memo"),
+                exchangeRate = if (item.isNull("exchangeRate")) null else item.optDouble("exchangeRate"),
                 createdAt = item.optLong("createdAt", System.currentTimeMillis()),
             )
         }

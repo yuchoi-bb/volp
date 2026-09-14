@@ -1,6 +1,7 @@
 package com.volp.travelbudget.data.repository
 
 import com.volp.travelbudget.data.backup.TripBackup
+import com.volp.travelbudget.data.exchange.ExchangeRateRepository
 import com.volp.travelbudget.data.local.CaptureSource
 import com.volp.travelbudget.data.local.ExpenseDao
 import com.volp.travelbudget.data.local.PendingStatus
@@ -16,6 +17,7 @@ import com.volp.travelbudget.domain.model.Trip
 import com.volp.travelbudget.domain.cardsms.CardTransaction
 import com.volp.travelbudget.domain.cardsms.TransactionKind
 import com.volp.travelbudget.domain.classify.RuleBasedMerchantClassifier
+import com.volp.travelbudget.domain.settlement.Settlement
 import com.volp.travelbudget.domain.summary.TripSummaries
 import com.volp.travelbudget.domain.summary.TripSummary
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +39,7 @@ class TripRepository(
     private val tripDao: TripDao,
     private val expenseDao: ExpenseDao,
     private val pendingDao: PendingTransactionDao,
+    private val exchangeRates: ExchangeRateRepository,
 ) {
 
     fun observeTripsWithSpending(): Flow<List<TripWithSpending>> =
@@ -130,12 +133,14 @@ class TripRepository(
         val pending = pendingDao.findById(pendingId)?.toDomain() ?: return null
         val trip = getTrip(tripId) ?: return null
         val sign = if (pending.kind == TransactionKind.CANCEL) -1 else 1
+        // 여행을 만들 때 넣은 값이 아니라 지금 받아 둔 환율을 쓴다.
+        val rate = if (pending.isOverseas) exchangeRates.rateFor(pending.currencyCode) else 1.0
 
         val expense = Expense(
             tripId = tripId,
             category = category,
             amountKrw = if (pending.isOverseas) {
-                TripSummaries.toKrw(pending.amount * sign, trip.exchangeRate)
+                TripSummaries.toKrw(pending.amount * sign, rate)
             } else {
                 (pending.amount * sign).toLong()
             },
@@ -143,6 +148,7 @@ class TripRepository(
             currencyCode = if (pending.isOverseas) pending.currencyCode else "KRW",
             date = pending.occurredAt.toLocalDate(),
             memo = pending.merchant,
+            exchangeRate = if (pending.isOverseas) rate else null,
         )
         val expenseId = expenseDao.insert(expense.toEntity())
         pendingDao.updateStatus(pendingId, PendingStatus.ACCEPTED.name, tripId, expenseId)
@@ -151,6 +157,28 @@ class TripRepository(
 
     suspend fun ignorePending(pendingId: Long) {
         pendingDao.updateStatus(pendingId, PendingStatus.IGNORED.name, null, null)
+    }
+
+    // ---- 실제 청구액 보정 ----
+
+    /** 보정 전 기준으로 본 이 여행의 해외 결제 승인액 합계. */
+    suspend fun approvedForeignTotal(tripId: Long): Long =
+        Settlement.approvedForeignTotal(expenseDao.findByTrip(tripId).map { it.toDomain() })
+
+    /**
+     * 카드 명세서의 실제 청구 총액에 맞춰 해외 결제 금액을 다시 계산한다.
+     *
+     * @param billedTotalKrw null이면 보정을 풀고 승인액 그대로 되돌린다.
+     */
+    suspend fun applySettlement(tripId: Long, billedTotalKrw: Long?) {
+        val trip = getTrip(tripId) ?: return
+        val expenses = expenseDao.findByTrip(tripId).map { it.toDomain() }
+        val factor = if (billedTotalKrw == null) 1.0 else Settlement.factorFor(billedTotalKrw, expenses)
+
+        Settlement.apply(expenses, factor).forEach { expenseDao.update(it.toEntity()) }
+        tripDao.update(
+            trip.copy(billedTotalKrw = billedTotalKrw, settlementFactor = factor).toEntity(),
+        )
     }
 
     // ---- 백업 ----

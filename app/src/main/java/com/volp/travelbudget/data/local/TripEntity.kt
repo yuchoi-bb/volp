@@ -24,6 +24,8 @@ data class TripEntity(
     val exchangeRate: Double,
     val predictedBudget: Map<ExpenseCategory, Long>,
     val plannedBudget: Map<ExpenseCategory, Long>,
+    val billedTotalKrw: Long?,
+    val settlementFactor: Double,
     val createdAt: Long,
 )
 
@@ -42,6 +44,8 @@ fun TripEntity.toDomain(): Trip = Trip(
     exchangeRate = exchangeRate,
     predictedBudget = predictedBudget,
     plannedBudget = plannedBudget,
+    billedTotalKrw = billedTotalKrw,
+    settlementFactor = settlementFactor,
     createdAt = createdAt,
 )
 
@@ -60,5 +64,7 @@ fun Trip.toEntity(): TripEntity = TripEntity(
     exchangeRate = exchangeRate,
     predictedBudget = predictedBudget,
     plannedBudget = plannedBudget,
+    billedTotalKrw = billedTotalKrw,
+    settlementFactor = settlementFactor,
     createdAt = createdAt,
 )

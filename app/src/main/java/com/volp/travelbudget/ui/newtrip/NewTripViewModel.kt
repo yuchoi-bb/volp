@@ -2,6 +2,7 @@ package com.volp.travelbudget.ui.newtrip
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.volp.travelbudget.data.exchange.ExchangeRateRepository
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.domain.budget.BudgetPredictor
 import com.volp.travelbudget.domain.budget.CurrencyRates
@@ -65,17 +66,35 @@ data class NewTripUiState(
         get() = title.isNotBlank() && !endDate.isBefore(startDate)
 }
 
-class NewTripViewModel(private val repository: TripRepository) : ViewModel() {
+class NewTripViewModel(
+    private val repository: TripRepository,
+    private val exchangeRates: ExchangeRateRepository,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(NewTripUiState().withSuggestedTitle())
     val state: StateFlow<NewTripUiState> = _state.asStateFlow()
+
+    init {
+        // 기본값 대신 받아 둔 환율을 채워 넣는다.
+        refreshRate(_state.value.currencyCode)
+    }
 
     private val _createdTripId = MutableStateFlow<Long?>(null)
     val createdTripId: StateFlow<Long?> = _createdTripId.asStateFlow()
 
     fun setTitle(value: String) = _state.update { it.copy(title = value, titleEditedByUser = true) }
 
-    fun setRegion(region: Region) = _state.update { current ->
+    /** 통화가 바뀌면 그 통화의 최신 환율로 갈아 끼운다. */
+    private fun refreshRate(code: String) {
+        viewModelScope.launch {
+            val rate = exchangeRates.rateFor(code)
+            _state.update { current ->
+                if (current.currencyCode == code) current.copy(exchangeRate = rate.toString()) else current
+            }
+        }
+    }
+
+    fun setRegion(region: Region) = _state.updateAndRefreshRate { current ->
         val first = DestinationCatalog.byRegion()[region]?.firstOrNull()
         current.copy(
             region = region,
@@ -85,7 +104,7 @@ class NewTripViewModel(private val repository: TripRepository) : ViewModel() {
         ).withSuggestedTitle()
     }
 
-    fun setDestination(key: String) = _state.update { current ->
+    fun setDestination(key: String) = _state.updateAndRefreshRate { current ->
         val destination = DestinationCatalog.find(key)
         current.copy(
             destinationKey = key,
@@ -118,11 +137,22 @@ class NewTripViewModel(private val repository: TripRepository) : ViewModel() {
 
     fun setIncludeFlight(value: Boolean) = _state.update { it.copy(includeFlight = value) }
 
-    fun setCurrency(code: String) = _state.update {
-        it.copy(currencyCode = code, exchangeRate = CurrencyRates.defaultRate(code).toString())
+    fun setCurrency(code: String) {
+        _state.update { it.copy(currencyCode = code, exchangeRate = CurrencyRates.defaultRate(code).toString()) }
+        refreshRate(code)
     }
 
     fun setExchangeRate(value: String) = _state.update { it.copy(exchangeRate = value) }
+
+    /** 상태를 바꾼 뒤 통화가 달라졌으면 환율도 새로 받아 온다. */
+    private fun MutableStateFlow<NewTripUiState>.updateAndRefreshRate(
+        transform: (NewTripUiState) -> NewTripUiState,
+    ) {
+        val before = value.currencyCode
+        update(transform)
+        val after = value.currencyCode
+        if (before != after) refreshRate(after)
+    }
 
     fun save() {
         val current = _state.value

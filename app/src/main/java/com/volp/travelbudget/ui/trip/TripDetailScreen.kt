@@ -25,6 +25,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +48,8 @@ import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.summary.CategoryProgress
 import com.volp.travelbudget.domain.summary.TripSummary
 import com.volp.travelbudget.ui.common.BudgetBar
+import com.volp.travelbudget.ui.common.LabeledRow
+import com.volp.travelbudget.ui.common.NumberField
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.StatTile
 import com.volp.travelbudget.ui.common.volpViewModelFactory
@@ -74,7 +77,9 @@ fun TripDetailScreen(
     )
     val summary by viewModel.summary.collectAsStateWithLifecycle()
     val expenses by viewModel.expenses.collectAsStateWithLifecycle()
+    val foreignApproved by viewModel.foreignApproved.collectAsStateWithLifecycle()
     var confirmDelete by remember { mutableStateOf(false) }
+    var editingSettlement by remember { mutableStateOf(false) }
 
     val current = summary
 
@@ -121,6 +126,17 @@ fun TripDetailScreen(
             item { SummaryCard(current) }
             item { CategoryCard(current) }
 
+            if (foreignApproved > 0L) {
+                item {
+                    SettlementCard(
+                        trip = current.trip,
+                        approvedForeign = foreignApproved,
+                        onEdit = { editingSettlement = true },
+                        onClear = { viewModel.applySettlement(null) },
+                    )
+                }
+            }
+
             item {
                 Text(
                     "지출 내역 ${expenses.size}건",
@@ -149,6 +165,18 @@ fun TripDetailScreen(
 
             item { Spacer(Modifier.height(64.dp)) }
         }
+    }
+
+    if (editingSettlement) {
+        SettlementDialog(
+            approvedForeign = foreignApproved,
+            current = current?.trip?.billedTotalKrw,
+            onDismiss = { editingSettlement = false },
+            onApply = {
+                viewModel.applySettlement(it)
+                editingSettlement = false
+            },
+        )
     }
 
     if (confirmDelete) {
@@ -316,4 +344,87 @@ private fun ExpenseRow(
             Icon(Icons.Default.Delete, contentDescription = "지출 삭제")
         }
     }
+}
+
+/**
+ * 카드 문자에 오는 것은 승인액이고 실제 청구는 해외이용수수료와 확정 환율 때문에 조금 다르다.
+ * 명세서가 나오면 총액을 한 번 넣어 건별로 맞춘다.
+ */
+@Composable
+private fun SettlementCard(
+    trip: com.volp.travelbudget.domain.model.Trip,
+    approvedForeign: Long,
+    onEdit: () -> Unit,
+    onClear: () -> Unit,
+) {
+    SectionCard("해외 결제 실제 청구액") {
+        LabeledRow("승인액 합계", formatKrw(approvedForeign))
+        Spacer(Modifier.height(6.dp))
+
+        val billed = trip.billedTotalKrw
+        if (billed == null) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "명세서에 찍힌 해외 결제 총액을 넣으면 수수료와 확정 환율만큼 건별로 맞춰 준다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) {
+                Text("실제 청구액 넣기")
+            }
+        } else {
+            LabeledRow("실제 청구액", formatKrw(billed))
+            Spacer(Modifier.height(6.dp))
+            val percent = (trip.settlementFactor - 1.0) * 100
+            LabeledRow(
+                label = "차이",
+                value = String.format(java.util.Locale.KOREA, "%+.1f%%", percent),
+                valueColor = if (percent > 0) BudgetColors.over else BudgetColors.under,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) { Text("고치기") }
+                TextButton(onClick = onClear, modifier = Modifier.weight(1f)) { Text("보정 풀기") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettlementDialog(
+    approvedForeign: Long,
+    current: Long?,
+    onDismiss: () -> Unit,
+    onApply: (Long) -> Unit,
+) {
+    var input by remember { mutableStateOf((current ?: approvedForeign).toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("실제 청구액") },
+        text = {
+            Column {
+                Text(
+                    "카드 명세서의 해외 결제 합계를 원화로 넣으세요. 승인액 ${formatKrw(approvedForeign)} 기준으로 " +
+                        "건별 금액을 비율에 맞춰 다시 계산한다.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.height(12.dp))
+                NumberField(
+                    label = "실제 청구 총액",
+                    value = input,
+                    onValueChange = { input = it },
+                    suffix = "원",
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = input.toLongOrNull()?.let { it > 0L } == true,
+                onClick = { input.toLongOrNull()?.let(onApply) },
+            ) { Text("적용") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+    )
 }

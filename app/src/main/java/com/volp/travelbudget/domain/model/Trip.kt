@@ -24,6 +24,10 @@ data class Trip(
     val predictedBudget: Map<ExpenseCategory, Long>,
     /** 실제로 쓰기로 한 예산. 처음에는 [predictedBudget]과 같다. */
     val plannedBudget: Map<ExpenseCategory, Long>,
+    /** 카드 명세서에 찍힌 해외 결제 실제 청구 총액(원). 아직 넣지 않았으면 null. */
+    val billedTotalKrw: Long? = null,
+    /** 승인액 대비 실제 청구액 비율. 보정 전에는 1.0. */
+    val settlementFactor: Double = 1.0,
     val createdAt: Long = System.currentTimeMillis(),
 ) {
     val nights: Int

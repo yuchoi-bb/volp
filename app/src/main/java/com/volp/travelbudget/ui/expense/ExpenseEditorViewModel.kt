@@ -3,6 +3,7 @@ package com.volp.travelbudget.ui.expense
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.volp.travelbudget.data.exchange.ExchangeRateRepository
 import com.volp.travelbudget.data.photos.PhotoStore
 import com.volp.travelbudget.data.photos.TripPhoto
 import com.volp.travelbudget.data.repository.TripRepository
@@ -46,6 +47,7 @@ data class ExpenseEditorUiState(
 class ExpenseEditorViewModel(
     private val repository: TripRepository,
     private val photoStore: PhotoStore,
+    private val exchangeRates: ExchangeRateRepository,
     private val tripId: Long,
     private val expenseId: Long,
 ) : ViewModel() {
@@ -71,7 +73,8 @@ class ExpenseEditorViewModel(
             val trip = repository.getTrip(tripId)
             val existing = if (expenseId > 0L) repository.getExpense(expenseId) else null
             val tripCurrency = trip?.currencyCode ?: "KRW"
-            val tripRate = trip?.exchangeRate ?: 1.0
+            // 여행을 만들 때 넣은 값보다 오늘 받아 둔 환율이 정확하다.
+            val tripRate = exchangeRates.rateFor(tripCurrency)
 
             _state.value = if (existing != null) {
                 ExpenseEditorUiState(
@@ -149,6 +152,7 @@ class ExpenseEditorViewModel(
                 currencyCode = if (current.useLocalCurrency) current.currencyCode else "KRW",
                 date = current.date,
                 memo = current.memo.trim(),
+                exchangeRate = if (current.useLocalCurrency) current.exchangeRate else null,
             )
             if (current.isEditing) {
                 repository.updateExpense(expense)

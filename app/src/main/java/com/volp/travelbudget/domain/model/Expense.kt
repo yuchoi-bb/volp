@@ -17,8 +17,13 @@ data class Expense(
     val currencyCode: String,
     val date: LocalDate,
     val memo: String,
+    /** 이 건에 적용한 환율(1 [currencyCode] 당 원). 나중에 실제 청구액으로 보정할 때 쓴다. */
+    val exchangeRate: Double? = null,
     val createdAt: Long = System.currentTimeMillis(),
 ) {
     val enteredInForeignCurrency: Boolean
         get() = originalAmount != null && currencyCode != "KRW"
+
+    /** 해외 결제인지. 보정은 해외 건에만 적용한다. */
+    val isForeign: Boolean get() = currencyCode != "KRW"
 }

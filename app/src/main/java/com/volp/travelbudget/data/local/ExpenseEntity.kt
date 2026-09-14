@@ -29,6 +29,7 @@ data class ExpenseEntity(
     val currencyCode: String,
     val date: LocalDate,
     val memo: String,
+    val exchangeRate: Double?,
     val createdAt: Long,
 )
 
@@ -41,6 +42,7 @@ fun ExpenseEntity.toDomain(): Expense = Expense(
     currencyCode = currencyCode,
     date = date,
     memo = memo,
+    exchangeRate = exchangeRate,
     createdAt = createdAt,
 )
 
@@ -53,5 +55,6 @@ fun Expense.toEntity(): ExpenseEntity = ExpenseEntity(
     currencyCode = currencyCode,
     date = date,
     memo = memo,
+    exchangeRate = exchangeRate,
     createdAt = createdAt,
 )

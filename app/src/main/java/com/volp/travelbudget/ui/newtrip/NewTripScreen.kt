@@ -54,7 +54,7 @@ fun NewTripScreen(
     onCreated: (Long) -> Unit,
 ) {
     val viewModel: NewTripViewModel = viewModel(
-        factory = volpViewModelFactory { NewTripViewModel(it.repository) },
+        factory = volpViewModelFactory { NewTripViewModel(it.repository, it.exchangeRates) },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val createdTripId by viewModel.createdTripId.collectAsStateWithLifecycle()
