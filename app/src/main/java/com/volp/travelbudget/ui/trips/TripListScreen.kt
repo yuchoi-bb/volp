@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
@@ -54,6 +55,7 @@ fun TripListScreen(
     onOpenTrip: (Long) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenInbox: () -> Unit,
+    onQuickExpense: () -> Unit,
 ) {
     val viewModel: TripListViewModel = viewModel(
         factory = volpViewModelFactory { TripListViewModel(it.repository) },
@@ -66,6 +68,9 @@ fun TripListScreen(
             TopAppBar(
                 title = { Text("내 여행") },
                 actions = {
+                    IconButton(onClick = onQuickExpense) {
+                        Icon(Icons.Default.Bolt, contentDescription = "현금 빠른 입력")
+                    }
                     BadgedBox(
                         badge = {
                             if (pendingCount > 0) {

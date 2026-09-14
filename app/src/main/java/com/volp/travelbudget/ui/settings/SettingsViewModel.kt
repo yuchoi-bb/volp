@@ -26,6 +26,10 @@ class SettingsViewModel(private val settings: AppSettings) : ViewModel() {
         viewModelScope.launch { settings.setAutoAssignEnabled(value) }
     }
 
+    fun setBudgetAlertsEnabled(value: Boolean) {
+        viewModelScope.launch { settings.setBudgetAlertsEnabled(value) }
+    }
+
     fun setAutoBackupEnabled(value: Boolean) {
         viewModelScope.launch { settings.setAutoBackupEnabled(value) }
     }

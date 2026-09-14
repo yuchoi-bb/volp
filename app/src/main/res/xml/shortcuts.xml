@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 여행 중에는 현금 입력이 가장 잦아 홈 화면에서 바로 열 수 있게 한다. -->
+    <shortcut
+        android:shortcutId="quick_expense"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_cash"
+        android:shortcutShortLabel="@string/shortcut_quick_short"
+        android:shortcutLongLabel="@string/shortcut_quick_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.volp.travelbudget"
+            android:targetClass="com.volp.travelbudget.MainActivity">
+            <extra
+                android:name="quick_entry"
+                android:value="true" />
+        </intent>
+    </shortcut>
+</shortcuts>

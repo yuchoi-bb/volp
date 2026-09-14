@@ -18,8 +18,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MerchantAliasEntity::class,
         ItineraryStopEntity::class,
         PackingCheckEntity::class,
+        BudgetAlertEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -38,6 +39,8 @@ abstract class VolpDatabase : RoomDatabase() {
     abstract fun merchantAliasDao(): MerchantAliasDao
 
     abstract fun itineraryDao(): ItineraryDao
+
+    abstract fun budgetAlertDao(): BudgetAlertDao
 
     companion object {
         private const val DATABASE_NAME = "volp.db"
@@ -174,6 +177,22 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        /** 이미 보낸 예산 알림을 기억하는 표를 더한 버전. */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `budget_alerts` (
+                        `tripId` INTEGER NOT NULL,
+                        `alertKey` TEXT NOT NULL,
+                        `notifiedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`tripId`, `alertKey`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -190,6 +209,7 @@ abstract class VolpDatabase : RoomDatabase() {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
+                    MIGRATION_6_7,
                 )
                 .build()
     }

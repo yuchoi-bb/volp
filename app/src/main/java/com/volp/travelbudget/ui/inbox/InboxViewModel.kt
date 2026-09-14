@@ -3,6 +3,7 @@ package com.volp.travelbudget.ui.inbox
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.volp.travelbudget.data.local.PendingTransaction
+import com.volp.travelbudget.data.alert.BudgetAlertNotifier
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.domain.model.Trip
@@ -30,7 +31,10 @@ data class InboxUiState(
     val isEmpty: Boolean get() = mine.isEmpty() && others.isEmpty()
 }
 
-class InboxViewModel(private val repository: TripRepository) : ViewModel() {
+class InboxViewModel(
+    private val repository: TripRepository,
+    private val alertNotifier: BudgetAlertNotifier,
+) : ViewModel() {
 
     val state: StateFlow<InboxUiState> = combine(
         repository.observePendingTransactions(),
@@ -70,6 +74,7 @@ class InboxViewModel(private val repository: TripRepository) : ViewModel() {
                 repository.rememberAlias(rawMerchant, displayName, category)
             }
             repository.acceptPending(pendingId, tripId, category, memoOverride = displayName)
+            alertNotifier.check(tripId)
         }
     }
 

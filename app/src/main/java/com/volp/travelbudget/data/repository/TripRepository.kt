@@ -85,6 +85,9 @@ class TripRepository(
 
     suspend fun getTrip(tripId: Long): Trip? = tripDao.findById(tripId)?.toDomain()
 
+    /** 지금 시점의 여행 목록. 한 번만 읽으면 되는 곳에 쓴다. */
+    suspend fun tripsOnce(): List<Trip> = tripDao.findAll().map { it.toDomain() }
+
     suspend fun createTrip(trip: Trip): Long = tripDao.insert(trip.toEntity())
 
     suspend fun updateTrip(trip: Trip) = tripDao.update(trip.toEntity())
@@ -92,6 +95,10 @@ class TripRepository(
     suspend fun deleteTrip(tripId: Long) = tripDao.deleteById(tripId)
 
     suspend fun getExpense(expenseId: Long): Expense? = expenseDao.findById(expenseId)?.toDomain()
+
+    /** 지금 시점의 지출 목록. 알림 판단처럼 한 번만 읽으면 되는 곳에 쓴다. */
+    suspend fun expensesOnce(tripId: Long): List<Expense> =
+        expenseDao.findByTrip(tripId).map { it.toDomain() }
 
     suspend fun addExpense(expense: Expense): Long = expenseDao.insert(expense.toEntity())
 

@@ -1,6 +1,7 @@
 package com.volp.travelbudget
 
 import android.app.Application
+import com.volp.travelbudget.data.alert.BudgetAlertNotifier
 import com.volp.travelbudget.data.backup.BackupWorker
 import com.volp.travelbudget.data.capture.CardCaptureHandler
 import com.volp.travelbudget.data.exchange.ExchangeRateRepository
@@ -52,8 +53,12 @@ class VolpApplication : Application() {
 
     val weatherRepository: WeatherRepository by lazy { WeatherRepository() }
 
+    val budgetAlertNotifier: BudgetAlertNotifier by lazy {
+        BudgetAlertNotifier(this, repository, database.budgetAlertDao(), settings)
+    }
+
     val captureHandler: CardCaptureHandler by lazy {
-        CardCaptureHandler(this, repository, settings)
+        CardCaptureHandler(this, repository, settings, budgetAlertNotifier)
     }
 
     override fun onCreate() {

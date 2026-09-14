@@ -70,6 +70,7 @@ fun ExpenseEditorScreen(
                 repository = app.repository,
                 photoStore = app.photoStore,
                 exchangeRates = app.exchangeRates,
+                alertNotifier = app.budgetAlertNotifier,
                 tripId = tripId,
                 expenseId = expenseId,
             )

@@ -19,13 +19,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
@@ -68,6 +70,7 @@ fun TripDetailScreen(
     tripId: Long,
     onBack: () -> Unit,
     onAddExpense: () -> Unit,
+    onQuickExpense: () -> Unit,
     onEditExpense: (Long) -> Unit,
     onEditBudget: () -> Unit,
     onOpenPhotos: () -> Unit,
@@ -116,8 +119,17 @@ fun TripDetailScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddExpense) {
-                Icon(Icons.Default.Add, contentDescription = "지출 추가")
+            // 여행 중에는 현금 입력이 가장 잦아 큰 버튼을 준다.
+            Column(horizontalAlignment = Alignment.End) {
+                SmallFloatingActionButton(onClick = onAddExpense) {
+                    Icon(Icons.Default.Add, contentDescription = "지출 자세히 입력")
+                }
+                Spacer(Modifier.height(12.dp))
+                ExtendedFloatingActionButton(
+                    onClick = onQuickExpense,
+                    icon = { Icon(Icons.Default.Bolt, contentDescription = null) },
+                    text = { Text("빠른 입력") },
+                )
             }
         },
     ) { padding ->

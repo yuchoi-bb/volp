@@ -22,6 +22,8 @@ data class VolpSettings(
     val captureEnabled: Boolean = true,
     /** 여행 기간과 항목이 확실한 결제는 확인 없이 바로 지출로 넣을지. */
     val autoAssignEnabled: Boolean = true,
+    /** 예산을 넘겼거나 넘길 것 같을 때 알려 줄지. */
+    val budgetAlertsEnabled: Boolean = true,
     /** Drive 자동 백업을 켤지. */
     val autoBackupEnabled: Boolean = true,
     /** 마지막으로 백업에 성공한 시각(epoch millis). 0이면 아직 없다. */
@@ -40,6 +42,7 @@ class AppSettings(private val context: Context) {
         val ownerName = stringPreferencesKey("owner_name")
         val captureEnabled = booleanPreferencesKey("capture_enabled")
         val autoAssignEnabled = booleanPreferencesKey("auto_assign_enabled")
+        val budgetAlertsEnabled = booleanPreferencesKey("budget_alerts_enabled")
         val autoBackupEnabled = booleanPreferencesKey("auto_backup_enabled")
         val lastBackupAt = longPreferencesKey("last_backup_at")
         val driveFolderId = stringPreferencesKey("drive_folder_id")
@@ -52,6 +55,7 @@ class AppSettings(private val context: Context) {
             ownerName = prefs[Keys.ownerName].orEmpty(),
             captureEnabled = prefs[Keys.captureEnabled] ?: true,
             autoAssignEnabled = prefs[Keys.autoAssignEnabled] ?: true,
+            budgetAlertsEnabled = prefs[Keys.budgetAlertsEnabled] ?: true,
             autoBackupEnabled = prefs[Keys.autoBackupEnabled] ?: true,
             lastBackupAt = prefs[Keys.lastBackupAt] ?: 0L,
             driveFolderId = prefs[Keys.driveFolderId],
@@ -65,6 +69,8 @@ class AppSettings(private val context: Context) {
     suspend fun setCaptureEnabled(value: Boolean) = edit { it[Keys.captureEnabled] = value }
 
     suspend fun setAutoAssignEnabled(value: Boolean) = edit { it[Keys.autoAssignEnabled] = value }
+
+    suspend fun setBudgetAlertsEnabled(value: Boolean) = edit { it[Keys.budgetAlertsEnabled] = value }
 
     suspend fun setAutoBackupEnabled(value: Boolean) = edit { it[Keys.autoBackupEnabled] = value }
 

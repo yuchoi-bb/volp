@@ -134,6 +134,21 @@ fun SettingsScreen(
                 )
             }
 
+            SectionCard("예산 경고") {
+                ToggleRow(
+                    label = "예산을 넘길 것 같으면 알리기",
+                    checked = state.budgetAlertsEnabled,
+                    onCheckedChange = viewModel::setBudgetAlertsEnabled,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "하루 몫을 크게 넘겼을 때, 지금 속도로 예산을 넘길 것 같을 때, 이미 넘겼을 때 알린다. " +
+                        "같은 알림은 한 번만 울린다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             SectionCard("백업") {
                 ToggleRow(
                     label = "Google Drive 자동 백업",

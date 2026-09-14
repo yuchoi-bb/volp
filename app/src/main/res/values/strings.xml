@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">볼프 여행가계부</string>
+    <string name="shortcut_quick_short">빠른 입력</string>
+    <string name="shortcut_quick_long">현금 빠른 입력</string>
 </resources>

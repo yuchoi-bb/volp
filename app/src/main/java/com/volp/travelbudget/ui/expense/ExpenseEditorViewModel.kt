@@ -3,6 +3,7 @@ package com.volp.travelbudget.ui.expense
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.volp.travelbudget.data.alert.BudgetAlertNotifier
 import com.volp.travelbudget.data.exchange.ExchangeRateRepository
 import com.volp.travelbudget.data.photos.PhotoStore
 import com.volp.travelbudget.data.photos.TripPhoto
@@ -48,6 +49,7 @@ class ExpenseEditorViewModel(
     private val repository: TripRepository,
     private val photoStore: PhotoStore,
     private val exchangeRates: ExchangeRateRepository,
+    private val alertNotifier: BudgetAlertNotifier,
     private val tripId: Long,
     private val expenseId: Long,
 ) : ViewModel() {
@@ -161,6 +163,7 @@ class ExpenseEditorViewModel(
                 _queuedReceipts.value.forEach { photoStore.attach(tripId, newId, it) }
                 _queuedReceipts.value = emptyList()
             }
+            alertNotifier.check(tripId)
             _state.update { it.copy(saved = true) }
         }
     }

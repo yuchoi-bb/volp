@@ -12,6 +12,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.volp.travelbudget.MainActivity
 import com.volp.travelbudget.R
+import com.volp.travelbudget.data.alert.BudgetAlertNotifier
 import com.volp.travelbudget.data.local.CaptureSource
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.settings.AppSettings
@@ -33,6 +34,7 @@ class CardCaptureHandler(
     private val context: Context,
     private val repository: TripRepository,
     private val settings: AppSettings,
+    private val budgetAlertNotifier: BudgetAlertNotifier,
 ) {
 
     suspend fun handle(
@@ -59,6 +61,7 @@ class CardCaptureHandler(
 
         // 여행 기간과 항목이 확실하면 확인을 기다리지 않고 바로 넣는다.
         val assignedTrip = if (current.autoAssignEnabled) repository.tryAutoAssign(pendingId) else null
+        assignedTrip?.let { budgetAlertNotifier.check(it.id) }
 
         notify(
             title = "${transaction.issuer.label} $amount",

@@ -23,6 +23,7 @@ import com.volp.travelbudget.ui.inbox.InboxScreen
 import com.volp.travelbudget.ui.newtrip.NewTripScreen
 import com.volp.travelbudget.ui.photos.TripPhotosScreen
 import com.volp.travelbudget.ui.plan.TripPlanScreen
+import com.volp.travelbudget.ui.quick.QuickExpenseScreen
 import com.volp.travelbudget.ui.settings.SettingsScreen
 import com.volp.travelbudget.ui.stats.TripStatsScreen
 import com.volp.travelbudget.ui.trip.TripDetailScreen
@@ -35,6 +36,9 @@ object Routes {
     const val NEW_TRIP = "trips/new"
     const val SETTINGS = "settings"
     const val INBOX = "inbox"
+
+    fun quickExpense(tripId: Long = 0L) = "quick?tripId=$tripId"
+    const val QUICK_EXPENSE_PATTERN = "quick?tripId={tripId}"
 
     fun tripDetail(tripId: Long) = "trips/$tripId"
     fun budgetEdit(tripId: Long) = "trips/$tripId/budget"
@@ -53,8 +57,8 @@ object Routes {
 
 @Composable
 fun VolpApp(
-    openInbox: Boolean = false,
-    onInboxOpened: () -> Unit = {},
+    startTarget: StartTarget = StartTarget.None,
+    onStartTargetHandled: () -> Unit = {},
 ) {
     val navController = rememberNavController()
 
@@ -68,11 +72,14 @@ fun VolpApp(
     // 앱을 열 때마다 한 번씩(하루에 몇 번까지만) 새 빌드가 있는지 확인한다.
     LaunchedEffect(Unit) { updateViewModel.check() }
 
-    LaunchedEffect(openInbox) {
-        if (openInbox) {
-            navController.navigate(Routes.INBOX)
-            onInboxOpened()
+    LaunchedEffect(startTarget) {
+        when (startTarget) {
+            StartTarget.None -> return@LaunchedEffect
+            StartTarget.Inbox -> navController.navigate(Routes.INBOX)
+            StartTarget.QuickEntry -> navController.navigate(Routes.quickExpense())
+            is StartTarget.Trip -> navController.navigate(Routes.tripDetail(startTarget.tripId))
         }
+        onStartTargetHandled()
     }
 
     Surface(
@@ -86,6 +93,7 @@ fun VolpApp(
                     onOpenTrip = { navController.navigate(Routes.tripDetail(it)) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                     onOpenInbox = { navController.navigate(Routes.INBOX) },
+                    onQuickExpense = { navController.navigate(Routes.quickExpense()) },
                 )
             }
 
@@ -108,6 +116,7 @@ fun VolpApp(
                     tripId = tripId,
                     onBack = { navController.popBackStack() },
                     onAddExpense = { navController.navigate(Routes.expenseEditor(tripId)) },
+                    onQuickExpense = { navController.navigate(Routes.quickExpense(tripId)) },
                     onEditExpense = { expenseId ->
                         navController.navigate(Routes.expenseEditor(tripId, expenseId))
                     },
@@ -171,6 +180,21 @@ fun VolpApp(
                 arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
             ) { entry ->
                 TripPlanScreen(
+                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Routes.QUICK_EXPENSE_PATTERN,
+                arguments = listOf(
+                    navArgument("tripId") {
+                        type = NavType.LongType
+                        defaultValue = 0L
+                    },
+                ),
+            ) { entry ->
+                QuickExpenseScreen(
                     tripId = entry.arguments?.getLong("tripId") ?: 0L,
                     onBack = { navController.popBackStack() },
                 )

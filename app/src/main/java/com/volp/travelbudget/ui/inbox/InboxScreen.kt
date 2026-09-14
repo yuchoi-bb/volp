@@ -65,7 +65,7 @@ import com.volp.travelbudget.util.formatKrw
 @Composable
 fun InboxScreen(onBack: () -> Unit) {
     val viewModel: InboxViewModel = viewModel(
-        factory = volpViewModelFactory { InboxViewModel(it.repository) },
+        factory = volpViewModelFactory { InboxViewModel(it.repository, it.budgetAlertNotifier) },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<InboxRow?>(null) }
