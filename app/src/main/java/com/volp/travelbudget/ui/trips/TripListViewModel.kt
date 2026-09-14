@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.repository.TripWithSpending
 import com.volp.travelbudget.data.settings.AppSettings
+import com.volp.travelbudget.domain.util.moved
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -13,7 +15,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class TripListViewModel(
-    repository: TripRepository,
+    private val repository: TripRepository,
     private val settings: AppSettings,
 ) : ViewModel() {
 
@@ -22,9 +24,19 @@ class TripListViewModel(
         .map { TripSort.fromName(it.tripSort) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), TripSort.DEFAULT)
 
+    /**
+     * 끌어 옮기는 중의 차례.
+     *
+     * 손가락을 따라 화면이 바로 움직여야 하는데 저장한 값이 돌아오기를 기다리면 한 박자 늦는다.
+     * 그동안은 이 값이 화면의 차례를 정한다.
+     */
+    private val dragging = MutableStateFlow<List<Long>?>(null)
+
     val trips: StateFlow<List<TripWithSpending>> =
-        combine(repository.observeTripsWithSpending(), sort) { trips, order -> order.sort(trips) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+        combine(repository.observeTripsWithSpending(), sort, dragging) { list, order, pending ->
+            val sorted = order.sort(list)
+            if (pending == null) sorted else sorted.sortedBy { pending.indexOf(it.trip.id) }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /** 아직 여행에 넣지 않은 카드 결제 건수. 목록 화면 배지에 쓴다. */
     val pendingCount: StateFlow<Int> = repository.observePendingCount()
@@ -32,6 +44,22 @@ class TripListViewModel(
 
     fun changeSort(value: TripSort) {
         viewModelScope.launch { settings.setTripSort(value.name) }
+    }
+
+    /** 끌어 옮기는 동안 차례를 바꿔 둔다. 아직 저장하지 않는다. */
+    fun moveTrip(from: Int, to: Int) {
+        val current = dragging.value ?: trips.value.map { it.trip.id }
+        dragging.value = current.moved(from, to)
+    }
+
+    /** 손가락을 뗐을 때 그 차례를 저장한다. */
+    fun commitOrder() {
+        val order = dragging.value ?: return
+        viewModelScope.launch {
+            repository.reorderTrips(order)
+            // 저장한 차례가 목록으로 돌아오면 임시 차례는 필요 없다.
+            dragging.value = null
+        }
     }
 
     private companion object {

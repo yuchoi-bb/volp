@@ -53,6 +53,14 @@ import com.volp.travelbudget.ui.theme.BudgetColors
 import com.volp.travelbudget.util.formatDateRange
 import com.volp.travelbudget.util.formatKrw
 import com.volp.travelbudget.util.formatKrwShort
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material3.CardDefaults
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import java.time.LocalDate
 
 @Composable
@@ -110,24 +118,60 @@ fun TripListScreen(
             }
         },
     ) { padding ->
-        if (trips.isEmpty()) {
-            EmptyTrips(Modifier.padding(padding))
-        } else {
+        val listState = rememberLazyListState()
+        val dragState = rememberDragReorderState(
+            listState = listState,
+            // 여행 카드만 끌어 옮긴다. 아래쪽 단추와 여백은 자리를 내주지 않는다.
+            canDrag = { it.key is Long },
+            onMove = viewModel::moveTrip,
+            onDrop = viewModel::commitOrder,
+        )
+
+        // 화면 끝까지 끌고 갔을 때 목록이 저절로 밀려야 아래쪽 여행으로 옮길 수 있다.
+        LaunchedEffect(dragState) {
+            dragState.autoScrollRequests.collect { amount -> dragState.scrollBy(amount) }
+        }
+
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            // 여행이 하나뿐이면 정렬 단추가 자리만 차지한다.
+            if (trips.size > 1) {
+                SortRow(
+                    selected = sort,
+                    onSelect = viewModel::changeSort,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+            }
+
+            if (trips.isEmpty()) {
+                EmptyTrips()
+                return@Scaffold
+            }
+
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
+                    .dragReorder(dragState, enabled = sort.draggable),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // 여행이 하나뿐이면 정렬 단추가 자리만 차지한다.
-                if (trips.size > 1) {
-                    item(key = "sort") {
-                        SortRow(selected = sort, onSelect = viewModel::changeSort)
-                    }
-                }
-                items(trips, key = { it.trip.id }) { item ->
-                    TripCard(item = item, onClick = { onOpenTrip(item.trip.id) })
+                itemsIndexed(trips, key = { _, item -> item.trip.id }) { index, item ->
+                    val dragging = dragState.isDragging(index)
+                    TripCard(
+                        item = item,
+                        dragging = dragging,
+                        showHandle = sort.draggable,
+                        onClick = { onOpenTrip(item.trip.id) },
+                        modifier = Modifier
+                            .zIndex(if (dragging) 1f else 0f)
+                            .graphicsLayer {
+                                translationY = if (dragging) dragState.offset else 0f
+                            },
+                    )
                 }
 
                 // 다녀온 여행이 있어야 볼 것이 있다.
@@ -149,16 +193,31 @@ fun TripListScreen(
 }
 
 @Composable
-private fun SortRow(selected: TripSort, onSelect: (TripSort) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        TripSort.entries.forEach { option ->
-            FilterChip(
-                selected = option == selected,
-                onClick = { onSelect(option) },
-                label = { Text(option.label) },
+private fun SortRow(
+    selected: TripSort,
+    onSelect: (TripSort) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TripSort.entries.forEach { option ->
+                FilterChip(
+                    selected = option == selected,
+                    onClick = { onSelect(option) },
+                    label = { Text(option.label) },
+                )
+            }
+        }
+
+        if (selected.draggable) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "카드를 길게 눌러 끌면 자리를 바꿀 수 있다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -180,20 +239,44 @@ private fun EmptyTrips(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TripCard(item: TripWithSpending, onClick: () -> Unit) {
+private fun TripCard(
+    item: TripWithSpending,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    dragging: Boolean = false,
+    showHandle: Boolean = false,
+) {
     val trip = item.trip
     val today = LocalDate.now()
     val status = trip.statusOn(today)
     val over = item.remaining < 0L
 
-    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Card(
+        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
+        // 끌고 있는 카드는 살짝 띄워 어느 것을 쥐고 있는지 알려 준다.
+        elevation = CardDefaults.cardElevation(defaultElevation = if (dragging) 8.dp else 0.dp),
+    ) {
         Column(Modifier.padding(16.dp)) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(trip.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    if (showHandle) {
+                        Icon(
+                            Icons.Default.DragHandle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(
+                        trip.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
                 Text(statusLabel(trip, status, today), style = MaterialTheme.typography.labelMedium)
             }
             Spacer(Modifier.height(4.dp))

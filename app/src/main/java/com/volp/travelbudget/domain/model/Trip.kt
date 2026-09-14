@@ -35,6 +35,12 @@ data class Trip(
     /** 목적지의 대표 좌표. 날씨 예보와 첫 동선의 기준점이다. */
     val latitude: Double? = null,
     val longitude: Double? = null,
+    /**
+     * 사용자가 손으로 정한 자리.
+     *
+     * 목록에서 끌어 옮길 때만 쓴다. 0이면 아직 손대지 않은 여행이라는 뜻이다.
+     */
+    val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
 ) : Syncable {
     val nights: Int

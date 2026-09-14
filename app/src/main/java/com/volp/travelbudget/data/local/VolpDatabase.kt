@@ -26,7 +26,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CashTopUpEntity::class,
         DocumentEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -384,6 +384,14 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        /** 목록에서 여행을 끌어 옮길 수 있게 자리 번호를 더한 버전. */
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 0은 아직 손대지 않았다는 뜻이다. 그때는 날짜 차례로 보여 준다.
+                db.execSQL("ALTER TABLE `trips` ADD COLUMN `sortOrder` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -406,6 +414,7 @@ abstract class VolpDatabase : RoomDatabase() {
                     MIGRATION_9_10,
                     MIGRATION_10_11,
                     MIGRATION_11_12,
+                    MIGRATION_12_13,
                 )
                 .build()
     }

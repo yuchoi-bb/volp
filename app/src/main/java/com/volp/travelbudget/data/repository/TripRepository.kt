@@ -140,6 +140,21 @@ class TripRepository(
             .filter { it.actual.isNotEmpty() }
 
     /**
+     * 목록에서 끌어 옮긴 차례를 저장한다.
+     *
+     * 자리 번호는 1부터 다시 매긴다. 사이에 끼워 넣을 때마다 소수점으로 쪼개는 방식도 있지만,
+     * 여행은 많아야 수십 개라 매번 다시 매기는 편이 단순하고 틀릴 일이 없다.
+     */
+    suspend fun reorderTrips(orderedIds: List<Long>) {
+        orderedIds.forEachIndexed { index, tripId ->
+            val trip = tripDao.findById(tripId)?.toDomain() ?: return@forEachIndexed
+            val place = index + 1
+            if (trip.sortOrder == place) return@forEachIndexed
+            tripDao.update(trip.copy(sortOrder = place).stamped().toEntity())
+        }
+    }
+
+    /**
      * 다녀온 여행의 결산.
      *
      * 예측과 실제를 함께 들고 오므로 화면에서 그대로 견줄 수 있다. 끝났는지는 화면 쪽에서

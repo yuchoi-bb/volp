@@ -141,6 +141,7 @@ object SyncCodec {
             .put("settlementFactor", trip.settlementFactor)
             .put("latitude", trip.latitude ?: JSONObject.NULL)
             .put("longitude", trip.longitude ?: JSONObject.NULL)
+            .put("sortOrder", trip.sortOrder)
             .put("createdAt", trip.createdAt)
     }
 
@@ -179,6 +180,7 @@ object SyncCodec {
             settlementFactor = json.optDouble("settlementFactor", 1.0),
             latitude = if (json.isNull("latitude")) null else json.optDouble("latitude"),
             longitude = if (json.isNull("longitude")) null else json.optDouble("longitude"),
+            sortOrder = json.optInt("sortOrder"),
             createdAt = json.optLong("createdAt", System.currentTimeMillis()),
         )
     }

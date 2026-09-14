@@ -31,6 +31,7 @@ data class TripEntity(
     val settlementFactor: Double,
     val latitude: Double?,
     val longitude: Double?,
+    @ColumnInfo(defaultValue = "0") val sortOrder: Int,
     val createdAt: Long,
 )
 
@@ -55,6 +56,7 @@ fun TripEntity.toDomain(): Trip = Trip(
     settlementFactor = settlementFactor,
     latitude = latitude,
     longitude = longitude,
+    sortOrder = sortOrder,
     createdAt = createdAt,
 )
 
@@ -79,5 +81,6 @@ fun Trip.toEntity(): TripEntity = TripEntity(
     settlementFactor = settlementFactor,
     latitude = latitude,
     longitude = longitude,
+    sortOrder = sortOrder,
     createdAt = createdAt,
 )
