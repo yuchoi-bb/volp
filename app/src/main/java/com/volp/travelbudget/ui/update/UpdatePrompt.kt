@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.volp.travelbudget.BuildConfig
 import com.volp.travelbudget.util.formatBytes
 
 /**
@@ -31,7 +32,14 @@ fun UpdatePrompt(
             title = { Text("새 버전 ${state.release.versionName}") },
             text = {
                 Column {
-                    Text("지금 내려받아 설치할까요?")
+                    Text(
+                        if (BuildConfig.CAN_SELF_INSTALL) {
+                            "지금 내려받아 설치할까요?"
+                        } else {
+                            // 설치 권한이 없는 빌드다. 브라우저에서 받아 직접 설치해야 한다.
+                            "릴리스 페이지를 열까요? 브라우저에서 내려받아 설치하면 된다."
+                        },
+                    )
                     if (state.release.sizeBytes > 0) {
                         Spacer(Modifier.height(8.dp))
                         Text(
@@ -49,7 +57,9 @@ fun UpdatePrompt(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.download(state.release) }) { Text("받아서 설치") }
+                TextButton(onClick = { viewModel.fetch(state.release) }) {
+                    Text(if (BuildConfig.CAN_SELF_INSTALL) "받아서 설치" else "받으러 가기")
+                }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.skip(state.release) }) { Text("이 버전 건너뛰기") }

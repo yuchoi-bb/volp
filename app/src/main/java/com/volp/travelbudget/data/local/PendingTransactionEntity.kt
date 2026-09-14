@@ -12,6 +12,9 @@ import java.time.LocalDateTime
 enum class CaptureSource(val label: String) {
     SMS("문자"),
     NOTIFICATION("앱 알림"),
+
+    /** 사람이 문자를 앱으로 넘겨 준 것. 문자 권한이 없는 빌드에서는 이 길만 있다. */
+    SHARED("공유"),
 }
 
 /** 미확인함에서의 처리 상태. */

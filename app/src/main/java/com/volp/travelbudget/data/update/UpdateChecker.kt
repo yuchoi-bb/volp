@@ -20,6 +20,8 @@ data class ReleaseInfo(
     val downloadUrl: String,
     val sizeBytes: Long,
     val notes: String,
+    /** 사람이 열어 보는 릴리스 페이지. 앱이 직접 설치하지 못하는 빌드에서 이쪽으로 보낸다. */
+    val pageUrl: String,
 )
 
 /**
@@ -84,6 +86,21 @@ class UpdateChecker(
         target
     }
 
+    /**
+     * 릴리스 페이지를 브라우저로 연다.
+     *
+     * 설치 권한이 없는 빌드에서는 앱이 APK를 직접 넘길 수 없다. 사람이 브라우저에서 받아
+     * 설치하는 편이 권한을 더 받는 것보다 낫다.
+     */
+    fun openReleasePage(release: ReleaseInfo) {
+        val url = release.pageUrl.ifBlank {
+            "https://github.com/${BuildConfig.UPDATE_REPO}/releases/latest"
+        }
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
     /** 설치 화면을 띄운다. 사용자가 마지막으로 한 번 더 확인하게 된다. */
     fun install(file: File) {
         val uri: Uri = FileProvider.getUriForFile(
@@ -116,20 +133,26 @@ class UpdateChecker(
         val versionCode = tag.substringAfterLast('.').toIntOrNull() ?: return null
 
         val assets = json.optJSONArray("assets") ?: return null
-        for (index in 0 until assets.length()) {
-            val asset = assets.getJSONObject(index)
-            val name = asset.optString("name")
-            if (!name.endsWith(".apk", ignoreCase = true)) continue
-            val url = asset.optString("browser_download_url").takeIf { it.isNotBlank() } ?: continue
-            return ReleaseInfo(
-                versionCode = versionCode,
-                versionName = tag,
-                downloadUrl = url,
-                sizeBytes = asset.optLong("size"),
-                notes = json.optString("body"),
-            )
+        val apks = (0 until assets.length())
+            .map { assets.getJSONObject(it) }
+            .filter { it.optString("name").endsWith(".apk", ignoreCase = true) }
+            .filter { it.optString("browser_download_url").isNotBlank() }
+
+        // 한 릴리스에 빌드가 둘 올라간다. 지금 깔린 것과 같은 갈래를 고르지 않으면
+        // 권한이 다른 앱으로 갈아타게 된다.
+        val mine = apks.firstOrNull {
+            it.optString("name").contains("-${BuildConfig.FLAVOR}-", ignoreCase = true)
         }
-        return null
+        val asset = mine ?: apks.firstOrNull() ?: return null
+
+        return ReleaseInfo(
+            versionCode = versionCode,
+            versionName = tag,
+            downloadUrl = asset.optString("browser_download_url"),
+            sizeBytes = asset.optLong("size"),
+            notes = json.optString("body"),
+            pageUrl = json.optString("html_url"),
+        )
     }
 
     companion object {

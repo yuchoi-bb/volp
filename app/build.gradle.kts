@@ -62,6 +62,32 @@ android {
         buildConfigField("boolean", "HAS_GEMINI_KEY", geminiApiKey.isNotBlank().toString())
     }
 
+    /**
+     * 같은 앱을 권한만 달리해 두 갈래로 낸다.
+     *
+     * 한국에서 도는 Google Play 프로텍트의 사기 방지는 스토어 밖에서 설치하는 앱이 문자 읽기와
+     * 알림 접근과 설치 권한을 함께 요구하면 코드를 보지 않고 막는다. 보이스피싱 앱이 OTP를
+     * 가로챌 때 쓰는 조합이기 때문이다. Volp가 카드 문자를 읽으려면 같은 권한이 필요해 그대로는
+     * 설치가 되지 않는다.
+     *
+     * 그래서 평소 쓰는 safe에서는 그 권한들을 아예 빼고, 자동 수집이 꼭 필요할 때만 full을
+     * ADB로 넣는다. 패키지 이름과 서명이 같으므로 서로 덮어써도 기록은 이어진다.
+     */
+    flavorDimensions += "capture"
+
+    productFlavors {
+        create("safe") {
+            dimension = "capture"
+            buildConfigField("boolean", "CAN_CAPTURE", "false")
+            buildConfigField("boolean", "CAN_SELF_INSTALL", "false")
+        }
+        create("full") {
+            dimension = "capture"
+            buildConfigField("boolean", "CAN_CAPTURE", "true")
+            buildConfigField("boolean", "CAN_SELF_INSTALL", "true")
+        }
+    }
+
     signingConfigs {
         if (hasReleaseSigning) {
             create("release") {

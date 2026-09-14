@@ -55,6 +55,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.domain.cardsms.TransactionKind
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.domain.model.Trip
+import com.volp.travelbudget.BuildConfig
 import com.volp.travelbudget.service.CardNotificationListener
 import com.volp.travelbudget.ui.common.DropdownField
 import com.volp.travelbudget.ui.common.volpViewModelFactory
@@ -155,6 +156,12 @@ private fun SectionTitle(text: String) {
 /** 문자·알림 권한이 없으면 수집이 되지 않으므로 맨 위에서 안내한다. */
 @Composable
 private fun PermissionCard() {
+    // 권한이 아예 없는 빌드에서 권한을 달라고 하면 거절만 돌아온다. 무엇을 하면 되는지 말해 준다.
+    if (!BuildConfig.CAN_CAPTURE) {
+        ShareInsteadCard()
+        return
+    }
+
     val context = LocalContext.current
     var smsGranted by remember {
         mutableStateOf(
@@ -219,6 +226,35 @@ private fun PermissionCard() {
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("알림 접근 설정 열기") }
             }
+        }
+    }
+}
+
+/**
+ * 자동 수집이 없는 빌드에서 대신 무엇을 하면 되는지.
+ *
+ * 문자·알림 읽기 권한을 함께 요구하는 앱은 보이스피싱 앱과 지문이 같아 기기가 설치를 막는다.
+ * 그래서 이 빌드에는 그 권한이 없고, 사람이 문자를 공유해서 넣는다.
+ */
+@Composable
+private fun ShareInsteadCard() {
+    Card {
+        Column(Modifier.padding(16.dp)) {
+            Text("카드 결제 넣는 법", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "이 빌드에는 문자·알림 읽기 권한이 없다. 결제 문자를 길게 눌러 Volp로 공유하면 " +
+                    "금액과 가맹점을 읽어 넣어 준다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "저절로 모으려면 자동 수집판(volp-full)을 PC에서 adb로 설치해야 한다. " +
+                    "두 빌드는 서명과 패키지가 같아 기록은 그대로 이어진다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    평소 쓰는 빌드.
+
+    문자 읽기·알림 접근·앱 설치 권한이 없다. 그 셋을 함께 요구하는 앱은 보이스피싱 앱과
+    권한 지문이 같아 스토어 밖에서 설치할 때 막히기 때문이다. 카드 결제는 문자를 Volp로
+    공유해서 넣고, 새 버전은 알림을 받아 브라우저에서 내려받는다.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

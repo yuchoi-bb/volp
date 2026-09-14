@@ -37,21 +37,27 @@ class CardCaptureHandler(
     private val budgetAlertNotifier: BudgetAlertNotifier,
 ) {
 
+    /**
+     * @param manual 사람이 직접 넘겨 준 것인지. 직접 넘긴 것은 자동 수집을 꺼 두었더라도 받는다.
+     * @return 읽어서 넣었으면 true
+     */
     suspend fun handle(
         body: String,
         sender: String?,
         source: CaptureSource,
         receivedAtMillis: Long = System.currentTimeMillis(),
-    ) {
+        manual: Boolean = false,
+    ): Boolean {
         val current = settings.settings.first()
-        if (!current.captureEnabled) return
+        if (!manual && !current.captureEnabled) return false
 
         val receivedAt = LocalDateTime.ofInstant(
             Instant.ofEpochMilli(receivedAtMillis),
             ZoneId.systemDefault(),
         )
-        val transaction = CardMessageParser.parse(body, receivedAt, sender) ?: return
-        val pendingId = repository.capture(transaction, source, current.ownerName) ?: return
+        val transaction = CardMessageParser.parse(body, receivedAt, sender) ?: return false
+        // 같은 결제가 문자와 알림으로 두 번 들어와도 지문으로 한 건만 남는다. 이미 있으면 null이다.
+        val pendingId = repository.capture(transaction, source, current.ownerName) ?: return false
 
         val amount = if (transaction.isOverseas) {
             formatForeign(transaction.amount, transaction.currencyCode)
@@ -71,6 +77,7 @@ class CardCaptureHandler(
                 "${transaction.merchant} · 어느 여행의 지출인지 정해 주세요"
             },
         )
+        return true
     }
 
     private fun notify(title: String, text: String) {

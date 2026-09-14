@@ -40,17 +40,20 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.domain.booking.BookingTextParser
+import com.volp.travelbudget.domain.cardsms.CardMessageParser
 import com.volp.travelbudget.domain.purchase.PurchaseTextParser
 import com.volp.travelbudget.ui.booking.BookingEditorScreen
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.ui.purchase.PurchaseEditorScreen
 import com.volp.travelbudget.util.formatDate
+import com.volp.travelbudget.util.formatForeign
 import com.volp.travelbudget.util.formatKrw
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /** 공유한 글을 무엇으로 넣을지. */
-private enum class ShareChoice { PURCHASE, BOOKING }
+private enum class ShareChoice { EXPENSE, PURCHASE, BOOKING }
 
 /**
  * 공유로 들어온 글을 받는 화면.
@@ -65,6 +68,7 @@ fun ShareCaptureScreen(text: String, onClose: () -> Unit) {
 
     when (choice) {
         null -> ShareChooser(text = text, onPick = { choice = it }, onClose = onClose)
+        ShareChoice.EXPENSE -> CardShareScreen(text = text, onClose = onClose)
         ShareChoice.PURCHASE -> PurchaseEditorScreen(sharedText = text, onDone = onClose)
         ShareChoice.BOOKING -> BookingShareScreen(text = text, onClose = onClose)
     }
@@ -75,7 +79,10 @@ private fun ShareChooser(text: String, onPick: (ShareChoice) -> Unit, onClose: (
     val today = LocalDate.now()
     val purchase = remember(text) { PurchaseTextParser.parse(text, today) }
     val booking = remember(text) { BookingTextParser.parse(text, today) }
-    val bookingWins = booking.confidence > purchase.confidence
+    // 카드 결제 문자는 서식이 뚜렷해 읽혔다면 거의 틀림없다. 읽혔으면 그쪽을 앞에 놓는다.
+    val card = remember(text) {
+        CardMessageParser.parse(text, LocalDateTime.now(), null)
+    }
 
     Scaffold(
         topBar = {
@@ -102,20 +109,29 @@ private fun ShareChooser(text: String, onPick: (ShareChoice) -> Unit, onClose: (
                 style = MaterialTheme.typography.titleMedium,
             )
 
-            val options = if (bookingWins) {
-                listOf(ShareChoice.BOOKING, ShareChoice.PURCHASE)
-            } else {
-                listOf(ShareChoice.PURCHASE, ShareChoice.BOOKING)
+            val ordered = buildList {
+                if (card != null) add(ShareChoice.EXPENSE)
+                if (booking.confidence > purchase.confidence) {
+                    add(ShareChoice.BOOKING)
+                    add(ShareChoice.PURCHASE)
+                } else {
+                    add(ShareChoice.PURCHASE)
+                    add(ShareChoice.BOOKING)
+                }
             }
 
-            options.forEachIndexed { index, option ->
+            ordered.forEachIndexed { index, option ->
                 ChoiceCard(
-                    title = if (option == ShareChoice.PURCHASE) "🛍️ 구매로 넣기" else "🎫 예약으로 넣기",
+                    title = when (option) {
+                        ShareChoice.EXPENSE -> "💳 지출로 넣기"
+                        ShareChoice.PURCHASE -> "🛍️ 구매로 넣기"
+                        ShareChoice.BOOKING -> "🎫 예약으로 넣기"
+                    },
                     recommended = index == 0,
-                    lines = if (option == ShareChoice.PURCHASE) {
-                        purchaseLines(purchase)
-                    } else {
-                        bookingLines(booking)
+                    lines = when (option) {
+                        ShareChoice.EXPENSE -> cardLines(card)
+                        ShareChoice.PURCHASE -> purchaseLines(purchase)
+                        ShareChoice.BOOKING -> bookingLines(booking)
                     },
                     onClick = { onPick(option) },
                 )
@@ -172,6 +188,21 @@ private fun ChoiceCard(
                 }
             }
         }
+    }
+}
+
+private fun cardLines(card: com.volp.travelbudget.domain.cardsms.CardTransaction?): List<String> {
+    if (card == null) return emptyList()
+    return buildList {
+        add("${card.issuer.label} · ${card.kind.label}")
+        add(
+            if (card.isOverseas) {
+                formatForeign(card.amount, card.currencyCode)
+            } else {
+                formatKrw(card.amount.toLong())
+            },
+        )
+        if (card.merchant.isNotBlank()) add(card.merchant)
     }
 }
 
@@ -262,3 +293,71 @@ private fun BookingShareScreen(text: String, onClose: () -> Unit) {
 }
 
 private const val MAX_PREVIEW = 400
+
+/**
+ * 공유한 카드 결제 문자를 미확인함에 넣는다.
+ *
+ * 문자를 저절로 읽는 빌드와 같은 길을 탄다. 여행 기간과 항목이 확실하면 바로 그 여행 지출이
+ * 되고, 아니면 미확인함에 쌓여 나중에 어느 여행 것인지 고르게 된다.
+ */
+@Composable
+private fun CardShareScreen(text: String, onClose: () -> Unit) {
+    val viewModel: CardShareViewModel = viewModel(
+        key = "card-${text.hashCode()}",
+        factory = volpViewModelFactory { CardShareViewModel(it.captureHandler, text) },
+    )
+    val state by viewModel.state.collectAsStateWithLifecycle()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("지출로 넣기") },
+                navigationIcon = {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Default.Close, contentDescription = "닫기")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            when (state) {
+                CardShareState.Working -> Text("읽는 중", style = MaterialTheme.typography.bodyLarge)
+
+                CardShareState.Saved -> {
+                    Text("넣었습니다", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "여행 기간과 항목이 확실하면 그 여행 지출로 들어가고, 아니면 미확인함에서 " +
+                            "어느 여행 것인지 고르면 된다.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                CardShareState.Duplicate -> {
+                    Text("이미 들어와 있습니다", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "같은 결제가 이미 기록돼 있어 다시 넣지 않았다.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                CardShareState.Unreadable -> {
+                    Text("읽지 못했습니다", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "카드 결제 문자로 보이지 않는다. 구매나 예약으로 넣어 보세요.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+    }
+}

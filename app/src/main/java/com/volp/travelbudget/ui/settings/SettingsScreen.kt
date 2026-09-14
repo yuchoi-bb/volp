@@ -112,6 +112,23 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             SectionCard("카드 결제 자동 기록") {
+                if (!BuildConfig.CAN_CAPTURE) {
+                    // 권한이 아예 없는 빌드다. 스위치를 켜 봐야 아무 일도 일어나지 않는다.
+                    Text(
+                        "이 빌드에는 문자·알림 읽기 권한이 없다. 카드 결제는 문자를 길게 눌러 " +
+                            "Volp로 공유하면 들어온다.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "자동으로 모으려면 자동 수집판(volp-full)을 ADB로 설치해야 한다. " +
+                            "두 빌드는 서명과 패키지가 같아 기록은 그대로 이어진다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+
                 OutlinedTextField(
                     value = state.ownerName,
                     onValueChange = viewModel::setOwnerName,
@@ -359,7 +376,10 @@ fun SettingsScreen(
             }
 
             SectionCard("앱 정보") {
-                Text("버전 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                Text(
+                    "버전 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · " +
+                        if (BuildConfig.CAN_CAPTURE) "자동 수집판" else "안전판",
+                )
 
                 Spacer(Modifier.height(10.dp))
                 Text(

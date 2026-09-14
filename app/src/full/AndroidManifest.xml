@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    자동 수집판에만 들어가는 것들.
+
+    카드 문자와 카드사 알림을 읽어 지출을 저절로 모으고, 새 빌드를 앱 안에서 바로 설치한다.
+    이 셋을 함께 요구하는 앱은 스토어 밖에서 설치할 때 사기 방지에 막히므로, 평소 쓰는
+    safe 빌드에는 넣지 않는다. 이 빌드는 ADB로 넣어 쓴다.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 카드사 결제 문자를 읽어 지출을 자동으로 모은다. -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- 내려받은 APK를 설치할 때 쓴다. 사용자가 매번 설치 여부를 확인한다. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+
+        <!-- 카드사 결제 문자 수신. 시스템만 보낼 수 있도록 권한을 건다. -->
+        <receiver
+            android:name=".service.CardSmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 카드사 앱이 띄우는 결제 알림 수신. 시스템만 바인딩할 수 있다. -->
+        <service
+            android:name=".service.CardNotificationListener"
+            android:exported="true"
+            android:label="볼프 카드 결제 수집"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- 내려받은 APK를 설치 화면에 넘겨주기 위한 통로. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+</manifest>

@@ -60,7 +60,7 @@ jobs:
           echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
 
       - name: 단위 테스트
-        run: ./gradlew --no-daemon testReleaseUnitTest
+        run: ./gradlew --no-daemon testSafeReleaseUnitTest
 
       - name: 릴리스 APK 빌드
         env:
@@ -69,21 +69,26 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: ./gradlew --no-daemon assembleRelease
+        run: ./gradlew --no-daemon assembleSafeRelease assembleFullRelease
 
+      # 두 빌드는 권한만 다르다. 이름으로 갈라 두지 않으면 어느 것을 받았는지 알 수 없다.
       - name: APK 이름 정리
         id: apk
         run: |
-          SRC=$(find app/build/outputs/apk/release -name '*.apk' | head -n 1)
-          DEST="volp-${VERSION_NAME}.apk"
-          cp "$SRC" "$DEST"
-          echo "path=$DEST" >> "$GITHUB_OUTPUT"
+          SAFE=$(find app/build/outputs/apk/safe/release -name '*.apk' | head -n 1)
+          FULL=$(find app/build/outputs/apk/full/release -name '*.apk' | head -n 1)
+          cp "$SAFE" "volp-safe-${VERSION_NAME}.apk"
+          cp "$FULL" "volp-full-${VERSION_NAME}.apk"
+          echo "safe=volp-safe-${VERSION_NAME}.apk" >> "$GITHUB_OUTPUT"
+          echo "full=volp-full-${VERSION_NAME}.apk" >> "$GITHUB_OUTPUT"
 
       - name: 빌드 결과 보관
         uses: actions/upload-artifact@v4
         with:
           name: volp-apk
-          path: ${{ steps.apk.outputs.path }}
+          path: |
+            ${{ steps.apk.outputs.safe }}
+            ${{ steps.apk.outputs.full }}
 
       - name: 테스트 리포트 보관
         if: failure()
@@ -97,7 +102,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${VERSION_NAME}" "${{ steps.apk.outputs.path }}" \
+          cat > release-notes.md <<'NOTES'
+          ### 어느 것을 받아야 하나
+
+          **volp-safe** — 평소 쓰는 빌드. 문자·알림 읽기와 앱 설치 권한이 없어 그냥 설치된다.
+          카드 결제는 결제 문자를 길게 눌러 Volp로 공유하면 들어온다.
+
+          **volp-full** — 카드 문자와 알림을 저절로 모으는 빌드. 권한 지문이 보이스피싱 앱과
+          같아 기기가 설치를 막으므로 PC에서 `adb install -r <파일>`로 넣어야 한다.
+
+          둘은 서명과 패키지가 같아 서로 덮어써도 기록이 그대로 이어진다.
+          NOTES
+          printf '\n커밋 %s · 브랜치 %s\n' "${GITHUB_SHA::7}" "$GITHUB_REF_NAME" >> release-notes.md
+          gh release create "v${VERSION_NAME}" \
+            "${{ steps.apk.outputs.safe }}" "${{ steps.apk.outputs.full }}" \
             --title "볼프 ${VERSION_NAME}" \
-            --notes "커밋 ${GITHUB_SHA::7} · 브랜치 ${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md \
             --target "$GITHUB_SHA"

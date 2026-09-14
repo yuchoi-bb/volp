@@ -2,6 +2,7 @@ package com.volp.travelbudget.ui.update
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.volp.travelbudget.BuildConfig
 import com.volp.travelbudget.data.settings.AppSettings
 import com.volp.travelbudget.data.update.ReleaseInfo
 import com.volp.travelbudget.data.update.UpdateChecker
@@ -55,6 +56,22 @@ class UpdateViewModel(
                 else -> UpdateState.Available(release)
             }
         }
+    }
+
+    /**
+     * 새 버전을 가져온다.
+     *
+     * 설치 권한이 없는 빌드에서는 앱이 APK를 설치 화면에 넘길 수 없다. 그 권한을 받으려 드는
+     * 대신 릴리스 페이지를 열어 준다.
+     */
+    fun fetch(release: ReleaseInfo) {
+        if (!BuildConfig.CAN_SELF_INSTALL) {
+            runCatching { checker.openReleasePage(release) }
+                .onFailure { _state.value = UpdateState.Failed(it.message ?: "릴리스 페이지를 열지 못했다") }
+            _state.value = UpdateState.Idle
+            return
+        }
+        download(release)
     }
 
     fun download(release: ReleaseInfo) {
