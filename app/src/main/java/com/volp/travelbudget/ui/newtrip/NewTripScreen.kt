@@ -207,6 +207,50 @@ fun NewTripScreen(
                 )
             }
 
+            if (state.isPastTrip) {
+                SectionCard("실제로 쓴 돈") {
+                    Text(
+                        "이미 다녀온 여행이다. 기억나는 만큼만 넣으면 된다. 나중에 카드 문자를 " +
+                            "모아 넣으면 그때 자세해진다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    ExpenseCategory.entries.forEach { category ->
+                        NumberField(
+                            label = "${category.emoji} ${category.label}",
+                            value = state.actualSpending[category].orEmpty(),
+                            onValueChange = { viewModel.setActualSpending(category, it) },
+                            suffix = "원",
+                        )
+                        Spacer(Modifier.height(10.dp))
+                    }
+
+                    LabeledRow(
+                        label = "합계",
+                        value = formatKrw(state.actualTotal),
+                        valueColor = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "예측으로는 ${formatKrw(state.predictedTotal)}이 나왔다. 견주어 보라고 남겨 둔다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Button(
+                    onClick = viewModel::save,
+                    enabled = state.canSave,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("지난 여행으로 기록하기")
+                }
+                Spacer(Modifier.height(24.dp))
+                return@Column
+            }
+
             SectionCard("예상 경비") {
                 val prediction = state.prediction
                 ExpenseCategory.entries.forEach { category ->

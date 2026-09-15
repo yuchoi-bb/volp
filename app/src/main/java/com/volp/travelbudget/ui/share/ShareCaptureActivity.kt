@@ -47,6 +47,11 @@ class ShareCaptureActivity : ComponentActivity() {
 
             val body = when (intent.action) {
                 Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
+                // 여러 건을 고르면 글이 여러 개로 온다. 빈 줄로 이어 붙여 한 덩어리로 다룬다.
+                Intent.ACTION_SEND_MULTIPLE ->
+                    intent.getStringArrayListExtra(Intent.EXTRA_TEXT)
+                        ?.filter { it.isNotBlank() }
+                        ?.joinToString("\n\n")
                 Intent.ACTION_PROCESS_TEXT ->
                     intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
                         ?: intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT_READONLY)?.toString()

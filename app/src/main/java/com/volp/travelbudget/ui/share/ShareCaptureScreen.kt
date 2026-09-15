@@ -40,12 +40,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.domain.booking.BookingTextParser
+import com.volp.travelbudget.domain.cardsms.CardMessageBatch
 import com.volp.travelbudget.domain.cardsms.CardMessageParser
 import com.volp.travelbudget.domain.purchase.PurchaseTextParser
 import com.volp.travelbudget.ui.booking.BookingEditorScreen
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.ui.purchase.PurchaseEditorScreen
+import com.volp.travelbudget.ui.smsimport.SmsImportScreen
 import com.volp.travelbudget.util.formatDate
 import com.volp.travelbudget.util.formatForeign
 import com.volp.travelbudget.util.formatKrw
@@ -53,7 +55,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 /** 공유한 글을 무엇으로 넣을지. */
-private enum class ShareChoice { EXPENSE, PURCHASE, BOOKING }
+private enum class ShareChoice { EXPENSE, EXPENSES, PURCHASE, BOOKING }
 
 /**
  * 공유로 들어온 글을 받는 화면.
@@ -69,6 +71,7 @@ fun ShareCaptureScreen(text: String, onClose: () -> Unit) {
     when (choice) {
         null -> ShareChooser(text = text, onPick = { choice = it }, onClose = onClose)
         ShareChoice.EXPENSE -> CardShareScreen(text = text, onClose = onClose)
+        ShareChoice.EXPENSES -> SmsImportScreen(sharedText = text, onDone = onClose)
         ShareChoice.PURCHASE -> PurchaseEditorScreen(sharedText = text, onDone = onClose)
         ShareChoice.BOOKING -> BookingShareScreen(text = text, onClose = onClose)
     }
@@ -83,6 +86,8 @@ private fun ShareChooser(text: String, onPick: (ShareChoice) -> Unit, onClose: (
     val card = remember(text) {
         CardMessageParser.parse(text, LocalDateTime.now(), null)
     }
+    // 여러 건을 한꺼번에 공유했으면 한 줄씩 확인하는 목록으로 보낸다.
+    val cards = remember(text) { CardMessageBatch.parseAll(text, LocalDateTime.now()) }
 
     Scaffold(
         topBar = {
@@ -110,7 +115,8 @@ private fun ShareChooser(text: String, onPick: (ShareChoice) -> Unit, onClose: (
             )
 
             val ordered = buildList {
-                if (card != null) add(ShareChoice.EXPENSE)
+                if (cards.size > 1) add(ShareChoice.EXPENSES)
+                if (card != null && cards.size <= 1) add(ShareChoice.EXPENSE)
                 if (booking.confidence > purchase.confidence) {
                     add(ShareChoice.BOOKING)
                     add(ShareChoice.PURCHASE)
@@ -123,12 +129,14 @@ private fun ShareChooser(text: String, onPick: (ShareChoice) -> Unit, onClose: (
             ordered.forEachIndexed { index, option ->
                 ChoiceCard(
                     title = when (option) {
+                        ShareChoice.EXPENSES -> "💳 지출 ${cards.size}건 넣기"
                         ShareChoice.EXPENSE -> "💳 지출로 넣기"
                         ShareChoice.PURCHASE -> "🛍️ 구매로 넣기"
                         ShareChoice.BOOKING -> "🎫 예약으로 넣기"
                     },
                     recommended = index == 0,
                     lines = when (option) {
+                        ShareChoice.EXPENSES -> cards.take(3).map { "${it.merchant} ${it.amount.toLong()}" }
                         ShareChoice.EXPENSE -> cardLines(card)
                         ShareChoice.PURCHASE -> purchaseLines(purchase)
                         ShareChoice.BOOKING -> bookingLines(booking)

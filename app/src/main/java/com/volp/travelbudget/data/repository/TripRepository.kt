@@ -325,6 +325,48 @@ class TripRepository(
         return expenseId
     }
 
+    /**
+     * 카드 결제 한 건을 여행 지출로 바로 넣는다.
+     *
+     * 미확인함을 거치지 않는다. 사람이 목록을 보며 확인한 뒤 넣는 길이라, 한 번 더 물을 이유가 없다.
+     */
+    suspend fun recordCardTransaction(
+        transaction: CardTransaction,
+        tripId: Long,
+        category: ExpenseCategory,
+        memo: String,
+    ): Long {
+        val sign = if (transaction.kind == TransactionKind.CANCEL) -1 else 1
+        val rate = if (transaction.isOverseas) exchangeRates.rateFor(transaction.currencyCode) else 1.0
+
+        return addExpense(
+            Expense(
+                tripId = tripId,
+                category = category,
+                amountKrw = if (transaction.isOverseas) {
+                    TripSummaries.toKrw(transaction.amount * sign, rate)
+                } else {
+                    (transaction.amount * sign).toLong()
+                },
+                originalAmount = if (transaction.isOverseas) transaction.amount * sign else null,
+                currencyCode = if (transaction.isOverseas) transaction.currencyCode else "KRW",
+                date = transaction.occurredAt.toLocalDate(),
+                memo = memo.ifBlank { transaction.merchant },
+                exchangeRate = if (transaction.isOverseas) rate else null,
+                method = PaymentMethod.CARD,
+            ),
+        )
+    }
+
+    /**
+     * 같은 결제가 이미 들어와 있는지.
+     *
+     * 문자를 두 번 공유하는 일이 흔하다. 날짜와 금액이 같으면 같은 결제로 본다. 같은 날 같은
+     * 금액을 두 번 쓰는 일이 없지는 않지만, 두 줄이 생기는 것보다 한 줄을 놓치는 편이 낫다.
+     */
+    suspend fun hasExpenseLike(tripId: Long, date: LocalDate, amountKrw: Long): Boolean =
+        expenseDao.findByTrip(tripId).any { it.date == date && it.amountKrw == amountKrw }
+
     suspend fun ignorePending(pendingId: Long) {
         pendingDao.updateStatus(pendingId, PendingStatus.IGNORED.name, null, null)
     }

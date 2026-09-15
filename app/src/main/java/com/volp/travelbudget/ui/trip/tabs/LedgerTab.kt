@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
+import com.volp.travelbudget.BuildConfig
 import com.volp.travelbudget.domain.cash.CashTopUp
 import com.volp.travelbudget.domain.cash.CashWallets
 import com.volp.travelbudget.domain.cash.TopUpKind
@@ -73,6 +74,7 @@ fun LedgerTab(
     onEditBudget: () -> Unit,
     onOpenStats: () -> Unit,
     onApplySettlement: (Long?) -> Unit,
+    onImportSms: () -> Unit,
     onAddTopUp: (TopUpKind, Double, Long, LocalDate, String) -> Unit,
     onDeleteTopUp: (Long) -> Unit,
     modifier: Modifier = Modifier,
@@ -183,6 +185,15 @@ fun LedgerTab(
         item {
             OutlinedButton(onClick = onAddExpense, modifier = Modifier.fillMaxWidth()) {
                 Text("지출 자세히 입력")
+            }
+        }
+
+        // 문자함을 읽을 수 있는 빌드에서만. 안전판에서는 문자 앱에서 공유해 들어온다.
+        if (BuildConfig.CAN_CAPTURE) {
+            item {
+                OutlinedButton(onClick = onImportSms, modifier = Modifier.fillMaxWidth()) {
+                    Text("문자에서 지출 모으기")
+                }
             }
         }
 

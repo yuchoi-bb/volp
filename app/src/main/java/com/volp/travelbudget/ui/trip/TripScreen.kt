@@ -64,6 +64,7 @@ fun TripScreen(
     onQuickExpense: () -> Unit,
     onEditBudget: () -> Unit,
     onOpenStats: () -> Unit,
+    onImportSms: () -> Unit,
     onAddBooking: (LocalDate) -> Unit,
     onEditBooking: (Long) -> Unit,
     onDeleted: () -> Unit,
@@ -153,6 +154,7 @@ fun TripScreen(
                     onEditBudget = onEditBudget,
                     onOpenStats = onOpenStats,
                     onApplySettlement = viewModel::applySettlement,
+                    onImportSms = onImportSms,
                     onAddTopUp = viewModel::addTopUp,
                     onDeleteTopUp = viewModel::deleteTopUp,
                 )

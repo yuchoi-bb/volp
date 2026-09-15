@@ -9,6 +9,7 @@ import com.volp.travelbudget.data.alert.RainAlertWorker
 import com.volp.travelbudget.data.backup.BackupManager
 import com.volp.travelbudget.data.backup.BackupWorker
 import com.volp.travelbudget.data.capture.CardCaptureHandler
+import com.volp.travelbudget.data.capture.SmsInbox
 import com.volp.travelbudget.data.exchange.ExchangeRateRepository
 import com.volp.travelbudget.data.local.VolpDatabase
 import com.volp.travelbudget.data.photos.PhotoStore
@@ -127,6 +128,9 @@ class VolpApplication : Application() {
             settings = settings,
         )
     }
+
+    /** 기기 문자함. 문자 권한이 없는 빌드에서는 늘 비어 있다. */
+    val smsInbox: SmsInbox by lazy { SmsInbox(this) }
 
     val captureHandler: CardCaptureHandler by lazy {
         CardCaptureHandler(this, repository, settings, budgetAlertNotifier)

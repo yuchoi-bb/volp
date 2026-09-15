@@ -31,6 +31,7 @@ import com.volp.travelbudget.ui.purchase.PurchaseEditorScreen
 import com.volp.travelbudget.ui.purchase.PurchaseListScreen
 import com.volp.travelbudget.ui.quick.QuickExpenseScreen
 import com.volp.travelbudget.ui.settings.SettingsScreen
+import com.volp.travelbudget.ui.smsimport.SmsImportScreen
 import com.volp.travelbudget.ui.stats.TripStatsScreen
 import com.volp.travelbudget.ui.trip.TripScreen
 import com.volp.travelbudget.ui.trips.TripListScreen
@@ -52,6 +53,7 @@ object Routes {
     fun stats(tripId: Long) = "trips/$tripId/stats"
     fun expenseEditor(tripId: Long, expenseId: Long = 0L) = "trips/$tripId/expense?expenseId=$expenseId"
     fun quickExpense(tripId: Long = 0L) = "quick?tripId=$tripId"
+    fun smsImport(tripId: Long) = "trips/$tripId/sms-import"
     fun purchaseEditor(purchaseId: Long = 0L, tripId: Long = 0L) =
         "purchases/editor?purchaseId=$purchaseId&tripId=$tripId"
     fun bookingEditor(tripId: Long, bookingId: Long = 0L, date: LocalDate? = null) =
@@ -64,6 +66,7 @@ object Routes {
     const val QUICK_EXPENSE_PATTERN = "quick?tripId={tripId}"
     const val BOOKING_EDITOR_PATTERN = "trips/{tripId}/booking?bookingId={bookingId}&date={date}"
     const val PURCHASE_EDITOR_PATTERN = "purchases/editor?purchaseId={purchaseId}&tripId={tripId}"
+    const val SMS_IMPORT_PATTERN = "trips/{tripId}/sms-import"
 }
 
 @Composable
@@ -187,6 +190,7 @@ fun VolpApp(
                     onQuickExpense = { navController.navigate(Routes.quickExpense(tripId)) },
                     onEditBudget = { navController.navigate(Routes.budgetEdit(tripId)) },
                     onOpenStats = { navController.navigate(Routes.stats(tripId)) },
+                    onImportSms = { navController.navigate(Routes.smsImport(tripId)) },
                     onAddBooking = { date -> navController.navigate(Routes.bookingEditor(tripId, date = date)) },
                     onEditBooking = { navController.navigate(Routes.bookingEditor(tripId, bookingId = it)) },
                     onDeleted = { navController.popBackStack() },
@@ -238,6 +242,16 @@ fun VolpApp(
                 arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
             ) { entry ->
                 BudgetEditScreen(
+                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
+                    onDone = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Routes.SMS_IMPORT_PATTERN,
+                arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
+            ) { entry ->
+                SmsImportScreen(
                     tripId = entry.arguments?.getLong("tripId") ?: 0L,
                     onDone = { navController.popBackStack() },
                 )

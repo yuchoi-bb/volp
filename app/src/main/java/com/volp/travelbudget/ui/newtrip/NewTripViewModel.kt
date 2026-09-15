@@ -10,6 +10,7 @@ import com.volp.travelbudget.domain.budget.DestinationCatalog
 import com.volp.travelbudget.domain.budget.SpendingProfile
 import com.volp.travelbudget.domain.budget.SpendingProfiles
 import com.volp.travelbudget.domain.model.Destination
+import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.domain.model.Region
 import com.volp.travelbudget.domain.model.TravelStyle
@@ -37,6 +38,13 @@ data class NewTripUiState(
     val exchangeRate: String = "9.3",
     /** 지난 여행에서 배운 내 씀씀이. 아직 배운 것이 없으면 비어 있다. */
     val profile: SpendingProfile = SpendingProfile(),
+    /**
+     * 이미 다녀온 여행을 기록하는 중일 때, 항목별로 실제 쓴 돈.
+     *
+     * 예측은 앞으로 쓸 돈을 어림하는 것이라 지난 여행에는 쓸모가 없다. 그때는 이 값이 곧 예산이자
+     * 지출이 된다.
+     */
+    val actualSpending: Map<ExpenseCategory, String> = emptyMap(),
 ) {
     val isCustomDestination: Boolean
         get() = destinationKey.startsWith(DestinationCatalog.CUSTOM_KEY_PREFIX)
@@ -73,6 +81,14 @@ data class NewTripUiState(
         get() = prediction.values.sum() - basePrediction.values.sum()
 
     val predictedTotal: Long get() = prediction.values.sum()
+
+    /** 이미 끝난 여행을 적는 중인지. 종료일이 어제까지면 그렇다. */
+    val isPastTrip: Boolean get() = endDate.isBefore(LocalDate.now())
+
+    fun actualFor(category: ExpenseCategory): Long =
+        actualSpending[category]?.replace(",", "")?.toLongOrNull() ?: 0L
+
+    val actualTotal: Long get() = ExpenseCategory.entries.sumOf { actualFor(it) }
 
     val canSave: Boolean
         get() = title.isNotBlank() && !endDate.isBefore(startDate)
@@ -165,6 +181,13 @@ class NewTripViewModel(
 
     fun setExchangeRate(value: String) = _state.update { it.copy(exchangeRate = value) }
 
+    /** 지난 여행에서 이 항목에 실제로 쓴 돈. */
+    fun setActualSpending(category: ExpenseCategory, value: String) = _state.update { current ->
+        current.copy(
+            actualSpending = current.actualSpending + (category to value.filter { it.isDigit() }),
+        )
+    }
+
     /** 상태를 바꾼 뒤 통화가 달라졌으면 환율도 새로 받아 온다. */
     private fun MutableStateFlow<NewTripUiState>.updateAndRefreshRate(
         transform: (NewTripUiState) -> NewTripUiState,
@@ -195,9 +218,41 @@ class NewTripViewModel(
                     ?: CurrencyRates.defaultRate(current.currencyCode),
                 predictedBudget = prediction,
                 // 처음에는 예측값을 그대로 예산으로 쓰고, 예산 조정 화면에서 고칠 수 있다.
-                plannedBudget = prediction,
+                // 지난 여행은 실제로 쓴 돈이 곧 예산이다. 그래야 '예산 대비'가 말이 된다.
+                plannedBudget = if (current.isPastTrip && current.actualTotal > 0L) {
+                    ExpenseCategory.entries.associateWith { current.actualFor(it) }
+                } else {
+                    prediction
+                },
             )
-            _createdTripId.value = repository.createTrip(trip)
+            val tripId = repository.createTrip(trip)
+            if (current.isPastTrip) recordActualSpending(tripId, current)
+            _createdTripId.value = tripId
+        }
+    }
+
+    /**
+     * 기억나는 금액을 항목마다 지출 한 건으로 넣는다.
+     *
+     * 지난 여행은 영수증이 남아 있지 않다. 항목별 어림값이라도 들어가야 '지난 여행 경비'와
+     * 예측 보정이 그 여행을 셈에 넣는다. 나중에 카드 문자를 모아 넣으면 그때 자세해진다.
+     */
+    private suspend fun recordActualSpending(tripId: Long, state: NewTripUiState) {
+        ExpenseCategory.entries.forEach { category ->
+            val amount = state.actualFor(category)
+            if (amount <= 0L) return@forEach
+
+            repository.addExpense(
+                Expense(
+                    tripId = tripId,
+                    category = category,
+                    amountKrw = amount,
+                    originalAmount = null,
+                    currencyCode = "KRW",
+                    date = state.startDate,
+                    memo = "지난 여행 기록",
+                ),
+            )
         }
     }
 }
