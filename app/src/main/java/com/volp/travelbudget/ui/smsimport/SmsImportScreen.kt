@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.BuildConfig
+import com.volp.travelbudget.domain.cardsms.PretripBookings
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.volpViewModelFactory
@@ -125,7 +126,9 @@ fun SmsImportScreen(
     ) { padding ->
         if (state.loading) return@Scaffold
 
-        if (state.rows.isEmpty()) {
+        // 여행 전 예약을 물어볼 자리가 있으면 목록이 비어도 화면을 그린다. 아직 떠나지 않은
+        // 여행은 기간 안의 결제가 하나도 없는 것이 오히려 보통이다.
+        if (state.rows.isEmpty() && !state.pretrip.visible) {
             EmptyImport(
                 needsPermission = state.needsPermission,
                 onAskPermission = {
@@ -159,6 +162,28 @@ fun SmsImportScreen(
                 }
             }
 
+            if (state.pretrip.visible) {
+                item(key = "pretrip") {
+                    PretripCard(
+                        ask = state.pretrip,
+                        tripTitle = state.trip?.title.orEmpty(),
+                        onDays = viewModel::setPretripDays,
+                        onScan = viewModel::scanPretrip,
+                        onDismiss = viewModel::dismissPretrip,
+                    )
+                }
+            }
+
+            if (state.rows.isEmpty()) {
+                item(key = "none") {
+                    Text(
+                        "이 여행 기간에는 카드 결제 문자가 없다.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             items(state.rows, key = { it.key }) { row ->
                 ImportRow(
                     row = row,
@@ -169,6 +194,68 @@ fun SmsImportScreen(
 
             item(key = "space") { Spacer(Modifier.height(16.dp)) }
         }
+    }
+}
+
+/**
+ * 여행 전 예약을 가져올지 묻는다.
+ *
+ * 앱이 알아서 몇 달 치를 훑지 않는다. 얼마나 거슬러 올라갈지 사람이 정하고, 누를 때만 읽는다.
+ */
+@Composable
+private fun PretripCard(
+    ask: PretripAsk,
+    tripTitle: String,
+    onDays: (Int) -> Unit,
+    onScan: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    SectionCard("여행 전에 예약한 것도 가져올까요") {
+        Text(
+            "항공권·숙소·렌터카는 떠나기 전에 미리 낸다. 여행 기간만 보면 가장 큰 돈이 장부에서 빠진다.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            if (tripTitle.isBlank()) "여행 시작일에서 며칠 전까지 찾을까요" else "$tripTitle 시작일에서 며칠 전까지 찾을까요",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PretripBookings.LOOKBACK_CHOICES.forEach { days ->
+                FilterChip(
+                    selected = ask.days == days,
+                    onClick = { onDays(days) },
+                    label = { Text("${days}일 전") },
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onScan, enabled = !ask.scanning) {
+                Text(if (ask.scanning) "찾는 중" else "예약 찾기")
+            }
+            TextButton(onClick = onDismiss) { Text("아니요") }
+        }
+        if (ask.done) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (ask.found > 0) {
+                    "여행 전 예약 ${ask.found}건을 목록 위에 올렸다."
+                } else {
+                    "이 기간에는 예약으로 읽히는 결제가 없다. 기간을 늘려 다시 찾아볼 수 있다."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "그 기간은 평소 생활비라서, 예약으로 읽히는 가맹점만 골라 온다.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -238,6 +325,13 @@ private fun ImportRow(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    row.pretripKind?.let { kind ->
+                        Text(
+                            "여행 전 예약 · ${kind.label}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
 
                 Text(

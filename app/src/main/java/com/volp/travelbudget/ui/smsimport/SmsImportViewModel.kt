@@ -7,6 +7,8 @@ import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.domain.cardsms.CardMessageBatch
 import com.volp.travelbudget.domain.cardsms.CardMessageParser
 import com.volp.travelbudget.domain.cardsms.CardTransaction
+import com.volp.travelbudget.domain.cardsms.PretripBookings
+import com.volp.travelbudget.domain.cardsms.PretripKind
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.domain.model.Trip
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +26,8 @@ data class SmsImportRow(
     val checked: Boolean,
     /** 같은 날 같은 금액이 이미 들어와 있는지. 기본으로 꺼 둔다. */
     val alreadyThere: Boolean,
+    /** 여행 전에 미리 결제한 예약이면 그 갈래. 여행 기간 안의 결제면 null. */
+    val pretripKind: PretripKind? = null,
 ) {
     val key: String
         get() = listOf(
@@ -35,6 +39,20 @@ data class SmsImportRow(
         ).joinToString("|")
 }
 
+/**
+ * 여행 전 예약을 찾아 올지 묻는 자리.
+ *
+ * 앱이 마음대로 몇 달 치를 훑지 않는다. 얼마나 거슬러 올라갈지 사람이 정하고 누를 때만 읽는다.
+ */
+data class PretripAsk(
+    val visible: Boolean = false,
+    val days: Int = PretripBookings.DEFAULT_LOOKBACK_DAYS,
+    val scanning: Boolean = false,
+    /** 한 번 찾아봤는지. 아무것도 없을 때 그렇게 말해 주려고 둔다. */
+    val done: Boolean = false,
+    val found: Int = 0,
+)
+
 data class SmsImportState(
     val loading: Boolean = true,
     val rows: List<SmsImportRow> = emptyList(),
@@ -43,6 +61,7 @@ data class SmsImportState(
     /** 문자함을 읽을 수 없는 빌드이거나 권한이 없을 때. */
     val needsPermission: Boolean = false,
     val savedCount: Int? = null,
+    val pretrip: PretripAsk = PretripAsk(),
 ) {
     val selected: List<SmsImportRow> get() = rows.filter { it.checked }
 
@@ -91,12 +110,15 @@ class SmsImportViewModel(
                 else -> emptyList()
             }
 
+            val scanning = sharedText.isNullOrBlank()
             _state.value = SmsImportState(
                 loading = false,
                 rows = transactions.map { row(it, target) },
                 trips = trips,
                 tripId = target,
-                needsPermission = sharedText.isNullOrBlank() && !inbox.canRead,
+                needsPermission = scanning && !inbox.canRead,
+                // 문자함을 훑는 길일 때만 묻는다. 공유로 들어온 글은 이미 사람이 고른 것이다.
+                pretrip = PretripAsk(visible = scanning && target != null && inbox.canRead),
             )
         }
     }
@@ -129,6 +151,61 @@ class SmsImportViewModel(
         )
     }
 
+    fun setPretripDays(days: Int) = _state.update {
+        it.copy(pretrip = it.pretrip.copy(days = days, done = false, found = 0))
+    }
+
+    fun dismissPretrip() = _state.update { it.copy(pretrip = it.pretrip.copy(visible = false)) }
+
+    /**
+     * 여행 시작 전 구간을 훑어 예약으로 읽히는 결제만 가져온다.
+     *
+     * 그 구간은 평소 생활비라서 전부 가져오면 목록이 못 쓰게 된다. 항공·숙소·렌터카·여행사로
+     * 읽히는 가맹점만 남기고, 그다음은 여행 기간 결제와 똑같이 사람이 골라 넣는다.
+     */
+    fun scanPretrip() {
+        val current = _state.value
+        val trip = current.trip ?: return
+        if (current.pretrip.scanning) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(pretrip = it.pretrip.copy(scanning = true)) }
+
+            val window = PretripBookings.window(trip.startDate, current.pretrip.days)
+            val found = inbox.messagesBetween(window.start, window.endInclusive)
+                .mapNotNull { message ->
+                    CardMessageParser.parse(message.body, message.receivedAt, message.sender)
+                }
+                .filter { it.isRecordable }
+                .mapNotNull { transaction ->
+                    PretripBookings.kindOf(transaction.merchant)?.let { transaction to it }
+                }
+                .distinctBy { (transaction, _) ->
+                    "${transaction.occurredAt}|${transaction.amount}|${transaction.merchant}"
+                }
+
+            val already = _state.value.rows.map { it.key }.toSet()
+            val rows = found
+                .map { (transaction, kind) ->
+                    val base = row(transaction, trip.id)
+                    base.copy(
+                        pretripKind = kind,
+                        // 가맹점 사전이 이미 항목을 알고 있으면 그것을 지킨다.
+                        category = if (base.category == ExpenseCategory.ETC) kind.category else base.category,
+                    )
+                }
+                .filterNot { it.key in already }
+
+            _state.update { state ->
+                state.copy(
+                    // 여행보다 앞선 날짜라 위로 붙인다.
+                    rows = rows + state.rows,
+                    pretrip = state.pretrip.copy(scanning = false, done = true, found = rows.size),
+                )
+            }
+        }
+    }
+
     fun toggle(key: String) = _state.update { current ->
         current.copy(
             rows = current.rows.map { if (it.key == key) it.copy(checked = !it.checked) else it },
@@ -146,14 +223,19 @@ class SmsImportViewModel(
     }
 
     fun setTrip(id: Long) {
-        _state.update { it.copy(tripId = id) }
+        // 여행이 바뀌면 여행 전 구간도 달라지므로 다시 찾을 수 있게 둔다.
+        _state.update { it.copy(tripId = id, pretrip = it.pretrip.copy(done = false, found = 0)) }
         // 여행이 바뀌면 '이미 있는 것'도 달라진다.
         viewModelScope.launch {
             val current = _state.value
             val rows = current.rows.map { existing ->
                 val refreshed = row(existing.transaction, current.tripId)
                 // 사람이 손으로 고른 항목과 체크는 지킨다.
-                refreshed.copy(category = existing.category, checked = existing.checked)
+                refreshed.copy(
+                    category = existing.category,
+                    checked = existing.checked,
+                    pretripKind = existing.pretripKind,
+                )
             }
             _state.update { it.copy(rows = rows) }
         }
