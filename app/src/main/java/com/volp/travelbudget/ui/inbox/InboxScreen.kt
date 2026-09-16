@@ -2,9 +2,7 @@
 
 package com.volp.travelbudget.ui.inbox
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,14 +47,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.domain.cardsms.TransactionKind
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.domain.model.Trip
 import com.volp.travelbudget.BuildConfig
-import com.volp.travelbudget.service.CardNotificationListener
+import com.volp.travelbudget.ui.common.CapturePermissionButtons
+import com.volp.travelbudget.ui.common.rememberCaptureAccess
 import com.volp.travelbudget.ui.common.DropdownField
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.util.formatDateTime
@@ -162,70 +160,14 @@ private fun PermissionCard() {
         return
     }
 
-    val context = LocalContext.current
-    var smsGranted by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) ==
-                PackageManager.PERMISSION_GRANTED,
-        )
-    }
-    val notificationAccess = remember {
-        Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
-            ?.contains(CardNotificationListener::class.java.name) == true
-    }
-
-    val smsLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { result ->
-        smsGranted = result[Manifest.permission.RECEIVE_SMS] == true
-    }
-
-    if (smsGranted && notificationAccess) return
+    val access = rememberCaptureAccess()
+    if (access.allGranted) return
 
     Card {
         Column(Modifier.padding(16.dp)) {
             Text("자동 수집을 켜려면", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-
-            if (!smsGranted) {
-                Text(
-                    "카드 결제 문자를 읽으려면 문자 권한이 필요하다.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = {
-                        smsLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.RECEIVE_SMS,
-                                Manifest.permission.READ_SMS,
-                                Manifest.permission.POST_NOTIFICATIONS,
-                            ),
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("문자 권한 허용") }
-                Spacer(Modifier.height(12.dp))
-            }
-
-            if (!notificationAccess) {
-                Text(
-                    "카드사 앱이 띄우는 결제 알림까지 읽으려면 알림 접근 권한이 필요하다.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = {
-                        context.startActivity(
-                            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("알림 접근 설정 열기") }
-            }
+            CapturePermissionButtons(access)
         }
     }
 }

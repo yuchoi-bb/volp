@@ -46,7 +46,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.BuildConfig
 import com.volp.travelbudget.data.backup.BackupManager
 import com.volp.travelbudget.data.settings.AppSettings
+import com.volp.travelbudget.ui.common.CapturePermissionButtons
 import com.volp.travelbudget.ui.common.DateField
+import com.volp.travelbudget.ui.common.rememberCaptureAccess
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.util.BuildIdentity
@@ -112,6 +114,25 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             SectionCard("카드 결제 자동 기록") {
+                if (BuildConfig.CAN_CAPTURE) {
+                    val access = rememberCaptureAccess()
+                    if (access.allGranted) {
+                        Text(
+                            "문자와 알림을 읽을 수 있다. 새 결제가 오면 저절로 들어온다.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else {
+                        Text(
+                            "아직 권한이 없어 한 통도 못 읽는다.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        CapturePermissionButtons(access)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+
                 if (!BuildConfig.CAN_CAPTURE) {
                     // 권한이 아예 없는 빌드다. 스위치를 켜 봐야 아무 일도 일어나지 않는다.
                     Text(
