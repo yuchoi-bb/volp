@@ -48,6 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.data.repository.TripWithSpending
 import com.volp.travelbudget.domain.model.TripStatus
 import com.volp.travelbudget.ui.common.BudgetBar
+import com.volp.travelbudget.ui.common.ReadableContent
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.ui.theme.BudgetColors
 import com.volp.travelbudget.util.formatDateRange
@@ -132,61 +133,60 @@ fun TripListScreen(
             dragState.autoScrollRequests.collect { amount -> dragState.scrollBy(amount) }
         }
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            // 여행이 하나뿐이면 정렬 단추가 자리만 차지한다.
-            if (trips.size > 1) {
-                SortRow(
-                    selected = sort,
-                    onSelect = viewModel::changeSort,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                )
-            }
-
-            if (trips.isEmpty()) {
-                EmptyTrips()
-                return@Scaffold
-            }
-
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .dragReorder(dragState, enabled = sort.draggable),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                itemsIndexed(trips, key = { _, item -> item.trip.id }) { index, item ->
-                    val dragging = dragState.isDragging(index)
-                    TripCard(
-                        item = item,
-                        dragging = dragging,
-                        showHandle = sort.draggable,
-                        onClick = { onOpenTrip(item.trip.id) },
-                        modifier = Modifier
-                            .zIndex(if (dragging) 1f else 0f)
-                            .graphicsLayer {
-                                translationY = if (dragging) dragState.offset else 0f
-                            },
+        // 태블릿에서는 목록이 화면 끝까지 늘어나지 않도록 읽을 만한 폭으로 모은다.
+        ReadableContent(Modifier.padding(padding)) {
+            Column(Modifier.fillMaxSize()) {
+                // 여행이 하나뿐이면 정렬 단추가 자리만 차지한다.
+                if (trips.size > 1) {
+                    SortRow(
+                        selected = sort,
+                        onSelect = viewModel::changeSort,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                 }
 
-                // 다녀온 여행이 있어야 볼 것이 있다.
-                if (trips.any { it.trip.statusOn(LocalDate.now()) == TripStatus.FINISHED }) {
-                    item(key = "past") {
-                        OutlinedButton(
-                            onClick = onOpenPastTrips,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("지난 여행에서 쓴 돈 보기")
-                        }
-                    }
+                if (trips.isEmpty()) {
+                    EmptyTrips()
+                    return@Column
                 }
 
-                item(key = "bottom") { Spacer(Modifier.height(72.dp)) }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .dragReorder(dragState, enabled = sort.draggable),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    itemsIndexed(trips, key = { _, item -> item.trip.id }) { index, item ->
+                        val dragging = dragState.isDragging(index)
+                        TripCard(
+                            item = item,
+                            dragging = dragging,
+                            showHandle = sort.draggable,
+                            onClick = { onOpenTrip(item.trip.id) },
+                            modifier = Modifier
+                                .zIndex(if (dragging) 1f else 0f)
+                                .graphicsLayer {
+                                    translationY = if (dragging) dragState.offset else 0f
+                                },
+                        )
+                    }
+
+                    // 다녀온 여행이 있어야 볼 것이 있다.
+                    if (trips.any { it.trip.statusOn(LocalDate.now()) == TripStatus.FINISHED }) {
+                        item(key = "past") {
+                            OutlinedButton(
+                                onClick = onOpenPastTrips,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("지난 여행에서 쓴 돈 보기")
+                            }
+                        }
+                    }
+
+                    item(key = "bottom") { Spacer(Modifier.height(72.dp)) }
+                }
             }
         }
     }

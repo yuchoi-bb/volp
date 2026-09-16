@@ -60,6 +60,7 @@ import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.domain.model.PaymentMethod
 import com.volp.travelbudget.ui.common.DateField
 import com.volp.travelbudget.ui.common.NumberField
+import com.volp.travelbudget.ui.common.ReadableContent
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.util.formatKrw
@@ -155,190 +156,191 @@ fun ExpenseEditorScreen(
             )
         },
     ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            SectionCard("얼마를 썼나요") {
-                if (!CurrencyRates.isKrw(state.currencyCode)) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "${state.currencyCode}로 입력",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Switch(
-                            checked = state.useLocalCurrency,
-                            onCheckedChange = viewModel::setUseLocalCurrency,
-                        )
+        ReadableContent(Modifier.padding(padding)) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                SectionCard("얼마를 썼나요") {
+                    if (!CurrencyRates.isKrw(state.currencyCode)) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "${state.currencyCode}로 입력",
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Switch(
+                                checked = state.useLocalCurrency,
+                                onCheckedChange = viewModel::setUseLocalCurrency,
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
                     }
-                    Spacer(Modifier.height(12.dp))
-                }
 
-                NumberField(
-                    label = "금액",
-                    value = state.amountInput,
-                    onValueChange = viewModel::setAmountInput,
-                    allowDecimal = state.useLocalCurrency,
-                    suffix = if (state.useLocalCurrency) state.currencyCode else "원",
-                )
-
-                if (state.useLocalCurrency) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "원화로 약 ${formatKrw(state.amountKrw)} (환율 ${state.exchangeRate})",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(12.dp))
                     NumberField(
-                        label = "이 건에 적용할 환율",
-                        value = state.exchangeRate.toString(),
-                        onValueChange = viewModel::setExchangeRate,
-                        allowDecimal = true,
-                        suffix = "원",
+                        label = "금액",
+                        value = state.amountInput,
+                        onValueChange = viewModel::setAmountInput,
+                        allowDecimal = state.useLocalCurrency,
+                        suffix = if (state.useLocalCurrency) state.currencyCode else "원",
                     )
-                }
-            }
 
-            SectionCard("어떤 지출인가요") {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ExpenseCategory.entries.forEach { category ->
-                        FilterChip(
-                            selected = state.category == category,
-                            onClick = { viewModel.setCategory(category) },
-                            label = { Text("${category.emoji} ${category.label}") },
+                    if (state.useLocalCurrency) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "원화로 약 ${formatKrw(state.amountKrw)} (환율 ${state.exchangeRate})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        NumberField(
+                            label = "이 건에 적용할 환율",
+                            value = state.exchangeRate.toString(),
+                            onValueChange = viewModel::setExchangeRate,
+                            allowDecimal = true,
+                            suffix = "원",
                         )
                     }
                 }
-            }
 
-            SectionCard("무엇으로 냈나요") {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PaymentMethod.entries.forEach { method ->
-                        FilterChip(
-                            selected = state.method == method,
-                            onClick = { viewModel.setMethod(method) },
-                            label = { Text("${method.emoji} ${method.label}") },
-                        )
+                SectionCard("어떤 지출인가요") {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ExpenseCategory.entries.forEach { category ->
+                            FilterChip(
+                                selected = state.category == category,
+                                onClick = { viewModel.setCategory(category) },
+                                label = { Text("${category.emoji} ${category.label}") },
+                            )
+                        }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "현금으로 고르면 여행 지갑에서 그만큼 빠진다.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
 
-            SectionCard("언제, 어디서") {
-                DateField("날짜", state.date, viewModel::setDate)
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = state.memo,
-                    onValueChange = viewModel::setMemo,
-                    label = { Text("가맹점 또는 메모") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            SectionCard("영수증 사진") {
-                if (receipts.isEmpty() && queuedReceipts.isEmpty()) {
+                SectionCard("무엇으로 냈나요") {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PaymentMethod.entries.forEach { method ->
+                            FilterChip(
+                                selected = state.method == method,
+                                onClick = { viewModel.setMethod(method) },
+                                label = { Text("${method.emoji} ${method.label}") },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        "영수증을 찍어 두면 나중에 금액을 확인하기 쉽다.",
+                        "현금으로 고르면 여행 지갑에서 그만큼 빠진다.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                } else {
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        receipts.forEach { photo ->
-                            ReceiptThumbnail(
-                                model = photo.uri,
-                                onRemove = { viewModel.removeReceipt(photo.id) },
-                            )
-                        }
-                        queuedReceipts.forEach { uri ->
-                            ReceiptThumbnail(
-                                model = uri,
-                                onRemove = { viewModel.removeQueuedReceipt(uri) },
-                            )
+                }
+
+                SectionCard("언제, 어디서") {
+                    DateField("날짜", state.date, viewModel::setDate)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = state.memo,
+                        onValueChange = viewModel::setMemo,
+                        label = { Text("가맹점 또는 메모") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                SectionCard("영수증 사진") {
+                    if (receipts.isEmpty() && queuedReceipts.isEmpty()) {
+                        Text(
+                            "영수증을 찍어 두면 나중에 금액을 확인하기 쉽다.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            receipts.forEach { photo ->
+                                ReceiptThumbnail(
+                                    model = photo.uri,
+                                    onRemove = { viewModel.removeReceipt(photo.id) },
+                                )
+                            }
+                            queuedReceipts.forEach { uri ->
+                                ReceiptThumbnail(
+                                    model = uri,
+                                    onRemove = { viewModel.removeQueuedReceipt(uri) },
+                                )
+                            }
                         }
                     }
-                }
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = {
-                        receiptPicker.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("영수증 사진 넣기") }
-
-                // 키가 없는 빌드에서는 이 기능 자체가 없다.
-                if (BuildConfig.HAS_GEMINI_KEY && (queuedReceipts.isNotEmpty() || receipts.isNotEmpty())) {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(12.dp))
                     OutlinedButton(
                         onClick = {
-                            viewModel.scanReceipt(
-                                uri = queuedReceipts.firstOrNull() ?: receipts.firstOrNull()?.uri,
-                                filePath = null,
+                            receiptPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                             )
                         },
-                        enabled = !scan.scanning,
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(if (scan.scanning) "영수증 읽는 중" else "영수증에서 금액 읽기")
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "사진 한 장이 읽기 위해 서버로 올라간다. 누를 때만 보낸다.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                    ) { Text("영수증 사진 넣기") }
 
-                if (scan.done) {
-                    Spacer(Modifier.height(10.dp))
-                    val reading = scan.reading
-                    if (reading == null || !reading.isUsable) {
+                    // 키가 없는 빌드에서는 이 기능 자체가 없다.
+                    if (BuildConfig.HAS_GEMINI_KEY && (queuedReceipts.isNotEmpty() || receipts.isNotEmpty())) {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.scanReceipt(
+                                    uri = queuedReceipts.firstOrNull() ?: receipts.firstOrNull()?.uri,
+                                    filePath = null,
+                                )
+                            },
+                            enabled = !scan.scanning,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (scan.scanning) "영수증 읽는 중" else "영수증에서 금액 읽기")
+                        }
+                        Spacer(Modifier.height(6.dp))
                         Text(
-                            "영수증에서 금액을 못 찾았다. 직접 넣어 주세요.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
+                            "사진 한 장이 읽기 위해 서버로 올라간다. 누를 때만 보낸다.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Spacer(Modifier.height(6.dp))
-                        TextButton(onClick = viewModel::dismissReading) { Text("닫기") }
-                    } else {
-                        Text(reading.summary, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = viewModel::applyReading) { Text("이대로 넣기") }
-                            TextButton(onClick = viewModel::dismissReading) { Text("아니요") }
+                    }
+
+                    if (scan.done) {
+                        Spacer(Modifier.height(10.dp))
+                        val reading = scan.reading
+                        if (reading == null || !reading.isUsable) {
+                            Text(
+                                "영수증에서 금액을 못 찾았다. 직접 넣어 주세요.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            TextButton(onClick = viewModel::dismissReading) { Text("닫기") }
+                        } else {
+                            Text(reading.summary, style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = viewModel::applyReading) { Text("이대로 넣기") }
+                                TextButton(onClick = viewModel::dismissReading) { Text("아니요") }
+                            }
                         }
                     }
                 }
-            }
 
-            Button(
-                onClick = viewModel::save,
-                enabled = state.canSave,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (state.isEditing) "수정 저장" else "기록하기")
+                Button(
+                    onClick = viewModel::save,
+                    enabled = state.canSave,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (state.isEditing) "수정 저장" else "기록하기")
+                }
+                Spacer(Modifier.height(24.dp))
             }
-            Spacer(Modifier.height(24.dp))
         }
     }
 }

@@ -3,6 +3,7 @@
 package com.volp.travelbudget.ui.trip
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.volp.travelbudget.ui.common.ReadableContent
+import com.volp.travelbudget.ui.common.isWideScreen
 import com.volp.travelbudget.ui.common.volpViewModelFactory
 import com.volp.travelbudget.ui.trip.tabs.LedgerTab
 import com.volp.travelbudget.ui.trip.tabs.RecordTab
@@ -97,6 +102,9 @@ fun TripScreen(
     // 탭이 아니라 다시 여는 화면이 된다.
     val tabStates = rememberSaveableStateHolder()
 
+    // 태블릿에서는 탭을 아래가 아니라 옆에 세운다. 넓은 화면에서 아래 끝은 손이 멀다.
+    val wide = isWideScreen()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -117,14 +125,16 @@ fun TripScreen(
             )
         },
         bottomBar = {
-            NavigationBar {
-                tabs.forEachIndexed { index, tab ->
-                    NavigationBarItem(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(tab.label) },
-                    )
+            if (!wide) {
+                NavigationBar {
+                    tabs.forEachIndexed { index, tab ->
+                        NavigationBarItem(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            icon = { Icon(tab.icon, contentDescription = null) },
+                            label = { Text(tab.label) },
+                        )
+                    }
                 }
             }
         },
@@ -136,44 +146,59 @@ fun TripScreen(
             return@Scaffold
         }
 
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            tabStates.SaveableStateProvider(selectedTab) {
-                when (selectedTab) {
-                    0 -> TodayTab(
-                        state = state,
-                        onRefreshLocation = viewModel::refreshLocation,
-                        onQuickExpense = onQuickExpense,
-                    )
+        Row(Modifier.fillMaxSize().padding(padding)) {
+            if (wide) {
+                NavigationRail {
+                    tabs.forEachIndexed { index, tab ->
+                        NavigationRailItem(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            icon = { Icon(tab.icon, contentDescription = null) },
+                            label = { Text(tab.label) },
+                        )
+                    }
+                }
+            }
 
-                    1 -> ScheduleTab(
-                        state = state,
-                        onAddStop = viewModel::addStop,
-                        onDeleteStop = viewModel::deleteStop,
-                        onMoveStop = viewModel::moveStop,
-                        onAddBooking = onAddBooking,
-                        onEditBooking = onEditBooking,
-                    )
+            ReadableContent {
+                tabStates.SaveableStateProvider(selectedTab) {
+                    when (selectedTab) {
+                        0 -> TodayTab(
+                            state = state,
+                            onRefreshLocation = viewModel::refreshLocation,
+                            onQuickExpense = onQuickExpense,
+                        )
 
-                    2 -> LedgerTab(
-                        state = state,
-                        onAddExpense = onAddExpense,
-                        onEditExpense = onEditExpense,
-                        onDeleteExpense = viewModel::deleteExpense,
-                        onEditBudget = onEditBudget,
-                        onOpenStats = onOpenStats,
-                        onApplySettlement = viewModel::applySettlement,
-                        onImportSms = onImportSms,
-                        onAddTopUp = viewModel::addTopUp,
-                        onDeleteTopUp = viewModel::deleteTopUp,
-                    )
+                        1 -> ScheduleTab(
+                            state = state,
+                            onAddStop = viewModel::addStop,
+                            onDeleteStop = viewModel::deleteStop,
+                            onMoveStop = viewModel::moveStop,
+                            onAddBooking = onAddBooking,
+                            onEditBooking = onEditBooking,
+                        )
 
-                    else -> RecordTab(
-                        state = state,
-                        onLoadDevicePhotos = viewModel::loadDevicePhotos,
-                        onAttachPhotos = viewModel::attachPhotos,
-                        onSaveNote = viewModel::saveNote,
-                        onTogglePacking = viewModel::togglePacking,
-                    )
+                        2 -> LedgerTab(
+                            state = state,
+                            onAddExpense = onAddExpense,
+                            onEditExpense = onEditExpense,
+                            onDeleteExpense = viewModel::deleteExpense,
+                            onEditBudget = onEditBudget,
+                            onOpenStats = onOpenStats,
+                            onApplySettlement = viewModel::applySettlement,
+                            onImportSms = onImportSms,
+                            onAddTopUp = viewModel::addTopUp,
+                            onDeleteTopUp = viewModel::deleteTopUp,
+                        )
+
+                        else -> RecordTab(
+                            state = state,
+                            onLoadDevicePhotos = viewModel::loadDevicePhotos,
+                            onAttachPhotos = viewModel::attachPhotos,
+                            onSaveNote = viewModel::saveNote,
+                            onTogglePacking = viewModel::togglePacking,
+                        )
+                    }
                 }
             }
         }
