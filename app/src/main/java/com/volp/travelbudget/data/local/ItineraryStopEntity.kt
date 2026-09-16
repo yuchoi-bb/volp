@@ -43,6 +43,8 @@ data class ItineraryStopEntity(
     /** `HH:mm`. 정하지 않았으면 null. */
     val startTime: String?,
     val memo: String,
+    /** 날짜를 옮길 수 있는 일정인지. [com.volp.travelbudget.domain.itinerary.PlanFixity]의 이름. */
+    @ColumnInfo(defaultValue = "FLEXIBLE") val fixity: String = "FLEXIBLE",
 )
 
 /** 준비물 체크 상태. 목록 자체는 규칙으로 만들고 체크만 저장한다. */

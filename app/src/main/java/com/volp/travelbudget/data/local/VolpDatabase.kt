@@ -26,7 +26,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CashTopUpEntity::class,
         DocumentEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -392,6 +392,15 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 예전에 넣은 일정은 모두 옮길 수 있는 것으로 본다.
+                db.execSQL(
+                    "ALTER TABLE `itinerary_stops` ADD COLUMN `fixity` TEXT NOT NULL DEFAULT 'FLEXIBLE'",
+                )
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -415,6 +424,7 @@ abstract class VolpDatabase : RoomDatabase() {
                     MIGRATION_10_11,
                     MIGRATION_11_12,
                     MIGRATION_12_13,
+                    MIGRATION_13_14,
                 )
                 .build()
     }

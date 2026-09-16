@@ -26,6 +26,8 @@ data class ItineraryStop(
     /** `HH:mm`. 정하지 않았으면 null. */
     val startTime: String? = null,
     val memo: String = "",
+    /** 날짜를 옮길 수 있는 일정인지. 투어나 항공편은 잡으면 못 옮긴다. */
+    val fixity: PlanFixity = PlanFixity.FLEXIBLE,
 ) : Syncable {
     val time: LocalTime?
         get() = startTime?.let { runCatching { LocalTime.parse(it) }.getOrNull() }

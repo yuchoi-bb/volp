@@ -6,6 +6,7 @@ import com.volp.travelbudget.data.local.ItineraryStopEntity
 import com.volp.travelbudget.data.local.PackingCheckEntity
 import com.volp.travelbudget.data.local.SyncDao
 import com.volp.travelbudget.domain.itinerary.ItineraryStop
+import com.volp.travelbudget.domain.itinerary.PlanFixity
 import com.volp.travelbudget.domain.sync.SyncIds
 import com.volp.travelbudget.domain.travel.GeoPoint
 import kotlinx.coroutines.flow.Flow
@@ -32,6 +33,7 @@ class ItineraryRepository(
         point: GeoPoint? = null,
         startTime: String? = null,
         memo: String = "",
+        fixity: PlanFixity = PlanFixity.FLEXIBLE,
     ): Long = dao.insert(
         ItineraryStopEntity(
             uid = SyncIds.newUid(),
@@ -45,6 +47,7 @@ class ItineraryRepository(
             longitude = point?.longitude,
             startTime = startTime,
             memo = memo,
+            fixity = fixity.name,
         ),
     )
 
@@ -98,6 +101,7 @@ private fun ItineraryStopEntity.toDomain() = ItineraryStop(
     point = if (latitude != null && longitude != null) GeoPoint(latitude, longitude) else null,
     startTime = startTime,
     memo = memo,
+    fixity = PlanFixity.fromName(fixity),
 )
 
 private fun ItineraryStop.toEntity() = ItineraryStopEntity(
@@ -113,6 +117,7 @@ private fun ItineraryStop.toEntity() = ItineraryStopEntity(
     longitude = point?.longitude,
     startTime = startTime,
     memo = memo,
+    fixity = fixity.name,
 )
 
 private fun ItineraryStop.stamped(): ItineraryStop =

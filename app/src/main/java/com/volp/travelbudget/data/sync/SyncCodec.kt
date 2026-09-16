@@ -6,6 +6,7 @@ import com.volp.travelbudget.domain.booking.BookingType
 import com.volp.travelbudget.domain.cash.CashTopUp
 import com.volp.travelbudget.domain.cash.TopUpKind
 import com.volp.travelbudget.domain.itinerary.ItineraryStop
+import com.volp.travelbudget.domain.itinerary.PlanFixity
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.domain.model.PaymentMethod
@@ -271,6 +272,7 @@ object SyncCodec {
         .put("address", stop.address)
         .put("startTime", stop.startTime ?: JSONObject.NULL)
         .put("memo", stop.memo)
+        .put("fixity", stop.fixity.name)
         .put("latitude", stop.point?.latitude ?: JSONObject.NULL)
         .put("longitude", stop.point?.longitude ?: JSONObject.NULL)
 
@@ -285,6 +287,8 @@ object SyncCodec {
         point = pointOf(json),
         startTime = if (json.isNull("startTime")) null else json.optString("startTime"),
         memo = json.optString("memo"),
+        // 이 값을 모르던 기기가 보낸 파일에는 없다. 그때는 옮길 수 있는 일정으로 본다.
+        fixity = PlanFixity.fromName(json.optString("fixity")),
     )
 
     // ---- 메모와 준비물 ----

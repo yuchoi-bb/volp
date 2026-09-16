@@ -72,6 +72,7 @@ fun TripScreen(
     onEditBudget: () -> Unit,
     onOpenStats: () -> Unit,
     onImportSms: () -> Unit,
+    onImportPlan: () -> Unit,
     onAddBooking: (LocalDate) -> Unit,
     onEditBooking: (Long) -> Unit,
     onDeleted: () -> Unit,
@@ -176,6 +177,7 @@ fun TripScreen(
                             onMoveStop = viewModel::moveStop,
                             onAddBooking = onAddBooking,
                             onEditBooking = onEditBooking,
+                            onImportPlan = onImportPlan,
                         )
 
                         2 -> LedgerTab(

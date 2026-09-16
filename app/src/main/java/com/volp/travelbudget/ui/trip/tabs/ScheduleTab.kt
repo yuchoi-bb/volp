@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.volp.travelbudget.domain.booking.Booking
 import com.volp.travelbudget.domain.booking.BookingType
 import com.volp.travelbudget.domain.itinerary.ItineraryStop
+import com.volp.travelbudget.domain.itinerary.PlanFixity
 import com.volp.travelbudget.domain.itinerary.PlanEntry
 import com.volp.travelbudget.domain.itinerary.phaseLabel
 import com.volp.travelbudget.domain.travel.TransportSuggestion
@@ -69,6 +70,7 @@ fun ScheduleTab(
     onMoveStop: (ItineraryStop, Boolean) -> Unit,
     onAddBooking: (LocalDate) -> Unit,
     onEditBooking: (Long) -> Unit,
+    onImportPlan: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val trip = state.trip ?: return
@@ -160,6 +162,12 @@ fun ScheduleTab(
                 OutlinedButton(onClick = { onAddBooking(selectedDate) }, modifier = Modifier.weight(1f)) {
                     Text("예약 넣기")
                 }
+            }
+        }
+
+        item {
+            OutlinedButton(onClick = onImportPlan, modifier = Modifier.fillMaxWidth()) {
+                Text("AI 일정 붙여넣기")
             }
         }
 
@@ -325,6 +333,18 @@ private fun StopCard(
                 }
                 if (stop.memo.isNotBlank()) {
                     Text(stop.memo, style = MaterialTheme.typography.bodySmall)
+                }
+                // 투어나 항공편은 날짜를 못 옮긴다. 일정을 손볼 때 이것부터 자리를 잡는다.
+                if (stop.fixity != PlanFixity.FLEXIBLE) {
+                    Text(
+                        "${stop.fixity.emoji} ${stop.fixity.label}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (stop.fixity == PlanFixity.FIXED) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
                 }
             }
             IconButton(onClick = { onMove(true) }, enabled = canMoveUp) {

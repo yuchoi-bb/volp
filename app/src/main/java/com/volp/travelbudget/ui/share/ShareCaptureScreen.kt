@@ -42,10 +42,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.domain.booking.BookingTextParser
 import com.volp.travelbudget.domain.cardsms.CardMessageBatch
 import com.volp.travelbudget.domain.cardsms.CardMessageParser
+import com.volp.travelbudget.domain.itinerary.PlanTextParser
 import com.volp.travelbudget.domain.purchase.PurchaseTextParser
 import com.volp.travelbudget.ui.booking.BookingEditorScreen
 import com.volp.travelbudget.ui.common.SectionCard
 import com.volp.travelbudget.ui.common.volpViewModelFactory
+import com.volp.travelbudget.ui.plan.PlanImportScreen
 import com.volp.travelbudget.ui.purchase.PurchaseEditorScreen
 import com.volp.travelbudget.ui.smsimport.SmsImportScreen
 import com.volp.travelbudget.util.formatDate
@@ -55,7 +57,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 /** 공유한 글을 무엇으로 넣을지. */
-private enum class ShareChoice { EXPENSE, EXPENSES, PURCHASE, BOOKING }
+private enum class ShareChoice { EXPENSE, EXPENSES, PURCHASE, BOOKING, PLAN }
 
 /**
  * 공유로 들어온 글을 받는 화면.
@@ -74,6 +76,7 @@ fun ShareCaptureScreen(text: String, onClose: () -> Unit) {
         ShareChoice.EXPENSES -> SmsImportScreen(sharedText = text, onDone = onClose)
         ShareChoice.PURCHASE -> PurchaseEditorScreen(sharedText = text, onDone = onClose)
         ShareChoice.BOOKING -> BookingShareScreen(text = text, onClose = onClose)
+        ShareChoice.PLAN -> PlanImportScreen(sharedText = text, onDone = onClose)
     }
 }
 
@@ -88,6 +91,8 @@ private fun ShareChooser(text: String, onPick: (ShareChoice) -> Unit, onClose: (
     }
     // 여러 건을 한꺼번에 공유했으면 한 줄씩 확인하는 목록으로 보낸다.
     val cards = remember(text) { CardMessageBatch.parseAll(text, LocalDateTime.now()) }
+    // AI가 짜 준 일정은 하루 머리글이 여럿이라 결제 문자와 헷갈릴 일이 없다.
+    val plan = remember(text) { PlanTextParser.parse(text, today) }
 
     Scaffold(
         topBar = {
@@ -115,6 +120,8 @@ private fun ShareChooser(text: String, onPick: (ShareChoice) -> Unit, onClose: (
             )
 
             val ordered = buildList {
+                // 하루가 둘 이상 읽혔으면 일정 글이 거의 틀림없다.
+                if (plan.size > 1) add(ShareChoice.PLAN)
                 if (cards.size > 1) add(ShareChoice.EXPENSES)
                 if (card != null && cards.size <= 1) add(ShareChoice.EXPENSE)
                 if (booking.confidence > purchase.confidence) {
@@ -124,6 +131,7 @@ private fun ShareChooser(text: String, onPick: (ShareChoice) -> Unit, onClose: (
                     add(ShareChoice.PURCHASE)
                     add(ShareChoice.BOOKING)
                 }
+                if (plan.size == 1) add(ShareChoice.PLAN)
             }
 
             ordered.forEachIndexed { index, option ->
@@ -133,6 +141,7 @@ private fun ShareChooser(text: String, onPick: (ShareChoice) -> Unit, onClose: (
                         ShareChoice.EXPENSE -> "💳 지출로 넣기"
                         ShareChoice.PURCHASE -> "🛍️ 구매로 넣기"
                         ShareChoice.BOOKING -> "🎫 예약으로 넣기"
+                        ShareChoice.PLAN -> "🗺️ 여행 일정으로 넣기"
                     },
                     recommended = index == 0,
                     lines = when (option) {
@@ -140,6 +149,10 @@ private fun ShareChooser(text: String, onPick: (ShareChoice) -> Unit, onClose: (
                         ShareChoice.EXPENSE -> cardLines(card)
                         ShareChoice.PURCHASE -> purchaseLines(purchase)
                         ShareChoice.BOOKING -> bookingLines(booking)
+                        ShareChoice.PLAN -> plan.take(3).map { day ->
+                            val name = day.heading.ifBlank { "${day.dayNumber ?: 1}일차" }
+                            "$name · ${day.stops.size}곳"
+                        }
                     },
                     onClick = { onPick(option) },
                 )

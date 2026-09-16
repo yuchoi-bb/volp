@@ -11,6 +11,7 @@ import com.volp.travelbudget.data.local.TripDao
 import com.volp.travelbudget.data.local.toDomain
 import com.volp.travelbudget.data.local.toEntity
 import com.volp.travelbudget.domain.itinerary.ItineraryStop
+import com.volp.travelbudget.domain.itinerary.PlanFixity
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.sync.SyncIds
 import com.volp.travelbudget.domain.trip.TripTwins
@@ -274,6 +275,7 @@ private fun com.volp.travelbudget.data.local.ItineraryStopEntity.toStop() = Itin
     point = if (latitude != null && longitude != null) GeoPoint(latitude, longitude) else null,
     startTime = startTime,
     memo = memo,
+    fixity = PlanFixity.fromName(fixity),
 )
 
 private fun ItineraryStop.toStopEntity() = com.volp.travelbudget.data.local.ItineraryStopEntity(
@@ -289,4 +291,5 @@ private fun ItineraryStop.toStopEntity() = com.volp.travelbudget.data.local.Itin
     longitude = point?.longitude,
     startTime = startTime,
     memo = memo,
+    fixity = fixity.name,
 )
