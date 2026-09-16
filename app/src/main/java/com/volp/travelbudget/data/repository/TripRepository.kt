@@ -28,6 +28,7 @@ import com.volp.travelbudget.domain.settlement.Settlement
 import com.volp.travelbudget.domain.sync.SyncIds
 import com.volp.travelbudget.domain.summary.TripSummaries
 import com.volp.travelbudget.domain.summary.TripSummary
+import com.volp.travelbudget.domain.trip.TripTwins
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -112,6 +113,44 @@ class TripRepository(
         }
         tripDao.deleteById(tripId)
     }
+
+    /**
+     * 목록에 두 벌로 남은 여행을 한 벌로 합친다.
+     *
+     * 폰과 태블릿에서 같은 여행을 따로 만든 뒤 기록을 주고받으면 이렇게 된다. 앱이 보기에는
+     * 서로 다른 여행 둘이라 저절로 합쳐지지 않는다.
+     *
+     * 남길 여행은 먼저 만든 쪽이다. 나머지에 붙어 있던 지출·예약·동선·메모·사진을 모두 그리로
+     * 옮긴 다음에 지운다. 옮기기 전에 지우면 붙어 있던 기록이 함께 사라진다.
+     *
+     * @return 합친 여행 수.
+     */
+    suspend fun mergeDuplicateTrips(): Int {
+        val groups = TripTwins.duplicates(tripDao.findAll().map { it.toDomain() })
+        var merged = 0
+
+        groups.forEach { group ->
+            val keepId = group.first().id
+            group.drop(1).forEach { extra ->
+                tripDao.moveExpenses(extra.id, keepId)
+                tripDao.moveBookings(extra.id, keepId)
+                tripDao.moveStops(extra.id, keepId)
+                tripDao.moveCashTopUps(extra.id, keepId)
+                tripDao.movePhotos(extra.id, keepId)
+                tripDao.movePurchases(extra.id, keepId)
+                tripDao.moveDocuments(extra.id, keepId)
+                tripDao.moveDayNotes(extra.id, keepId)
+                tripDao.movePackingChecks(extra.id, keepId)
+                deleteTrip(extra.id)
+                merged++
+            }
+        }
+        return merged
+    }
+
+    /** 지금 두 벌로 남아 있는 여행 묶음. 목록 화면에서 알려 주려고 쓴다. */
+    fun observeDuplicateTrips(): Flow<List<List<Trip>>> =
+        tripDao.observeAll().map { entities -> TripTwins.duplicates(entities.map { it.toDomain() }) }
 
     suspend fun getExpense(expenseId: Long): Expense? = expenseDao.findById(expenseId)?.toDomain()
 

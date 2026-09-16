@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.repository.TripWithSpending
 import com.volp.travelbudget.data.settings.AppSettings
+import com.volp.travelbudget.domain.model.Trip
 import com.volp.travelbudget.domain.util.moved
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -38,9 +39,23 @@ class TripListViewModel(
             if (pending == null) sorted else sorted.sortedBy { pending.indexOf(it.trip.id) }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
+    /**
+     * 같은 여행이 두 벌로 남아 있는 묶음.
+     *
+     * 두 기기에서 같은 여행을 따로 만든 뒤 기록을 주고받으면 이렇게 된다. 목록에서 바로 알려
+     * 주고 한 번에 합칠 수 있게 한다.
+     */
+    val duplicates: StateFlow<List<List<Trip>>> = repository.observeDuplicateTrips()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
     /** 아직 여행에 넣지 않은 카드 결제 건수. 목록 화면 배지에 쓴다. */
     val pendingCount: StateFlow<Int> = repository.observePendingCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
+
+    /** 겹치는 여행을 한 벌로 합친다. 붙어 있던 기록은 남는 여행으로 옮겨진다. */
+    fun mergeDuplicates() {
+        viewModelScope.launch { repository.mergeDuplicateTrips() }
+    }
 
     fun changeSort(value: TripSort) {
         viewModelScope.launch { settings.setTripSort(value.name) }

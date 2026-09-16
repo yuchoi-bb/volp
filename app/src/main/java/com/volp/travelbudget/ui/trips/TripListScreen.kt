@@ -24,8 +24,10 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -36,9 +38,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -81,6 +87,8 @@ fun TripListScreen(
     val trips by viewModel.trips.collectAsStateWithLifecycle()
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
     val sort by viewModel.sort.collectAsStateWithLifecycle()
+    val duplicates by viewModel.duplicates.collectAsStateWithLifecycle()
+    var confirmMerge by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -136,6 +144,14 @@ fun TripListScreen(
         // 태블릿에서는 목록이 화면 끝까지 늘어나지 않도록 읽을 만한 폭으로 모은다.
         ReadableContent(Modifier.padding(padding)) {
             Column(Modifier.fillMaxSize()) {
+                if (duplicates.isNotEmpty()) {
+                    DuplicateNotice(
+                        titles = duplicates.map { it.first().title },
+                        onMerge = { confirmMerge = true },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                }
+
                 // 여행이 하나뿐이면 정렬 단추가 자리만 차지한다.
                 if (trips.size > 1) {
                     SortRow(
@@ -188,6 +204,64 @@ fun TripListScreen(
                     item(key = "bottom") { Spacer(Modifier.height(72.dp)) }
                 }
             }
+        }
+    }
+
+    if (confirmMerge) {
+        AlertDialog(
+            onDismissRequest = { confirmMerge = false },
+            title = { Text("겹치는 여행을 합칠까요") },
+            text = {
+                Text(
+                    "제목과 기간이 같은 여행을 한 벌로 만든다. 양쪽에 붙어 있던 지출·예약·동선·" +
+                        "메모·사진은 모두 남는 여행으로 옮겨진다. 되돌릴 수 없다.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmMerge = false
+                        viewModel.mergeDuplicates()
+                    },
+                ) { Text("합치기") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmMerge = false }) { Text("취소") }
+            },
+        )
+    }
+}
+
+/**
+ * 같은 여행이 두 벌로 있을 때 목록 맨 위에 알린다.
+ *
+ * 두 기기에서 같은 여행을 따로 만든 뒤 기록을 주고받으면 이렇게 된다. 앱은 기록을 uid로
+ * 짝짓는데 그 값은 만든 기기에서 매기므로, 사람 눈에 같은 여행이어도 앱에는 둘이다.
+ */
+@Composable
+private fun DuplicateNotice(
+    titles: List<String>,
+    onMerge: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "같은 여행이 두 벌로 있다",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                titles.joinToString(", "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Spacer(Modifier.height(10.dp))
+            Button(onClick = onMerge) { Text("하나로 합치기") }
         }
     }
 }

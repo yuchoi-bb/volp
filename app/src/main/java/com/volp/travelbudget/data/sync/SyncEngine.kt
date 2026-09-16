@@ -13,6 +13,7 @@ import com.volp.travelbudget.data.local.toEntity
 import com.volp.travelbudget.domain.itinerary.ItineraryStop
 import com.volp.travelbudget.domain.model.Expense
 import com.volp.travelbudget.domain.sync.SyncIds
+import com.volp.travelbudget.domain.trip.TripTwins
 import com.volp.travelbudget.domain.sync.SyncMerge
 import com.volp.travelbudget.domain.sync.Tombstone
 import com.volp.travelbudget.domain.travel.GeoPoint
@@ -101,15 +102,40 @@ class SyncEngine(
         remote: SyncSnapshot,
         tombstones: Map<String, List<DeletionEntity>>,
     ) {
+        val localTrips = tripDao.findAll().map { it.toDomain() }
         val outcome = SyncMerge.merge(
-            local = tripDao.findAll().map { it.toDomain() },
+            local = localTrips,
             remote = remote.trips.map { it.trip },
             localTombstones = tombstones.stones("trip"),
         )
 
+        val remoteUids = remote.trips.map { it.trip.uid }.toSet()
+        // 한 여행을 두 번 짝지으면 앞의 짝이 덮인다.
+        val takenTwins = mutableSetOf<Long>()
+
         outcome.incoming.forEach { trip ->
             val existing = syncDao.tripByUid(trip.uid)
-            syncDao.upsertTrip(trip.copy(id = existing?.id ?: 0L).toEntity())
+            when {
+                existing != null -> syncDao.upsertTrip(trip.copy(id = existing.id).toEntity())
+
+                else -> {
+                    // uid는 만든 기기에서 매긴다. 두 기기에서 같은 여행을 따로 만들었으면 uid가
+                    // 둘이라 그대로 두면 목록에 같은 여행이 두 줄로 남는다.
+                    val twin = TripTwins.findTwin(
+                        incoming = trip,
+                        local = localTrips.filterNot { it.id in takenTwins },
+                        remoteUids = remoteUids,
+                    )
+                    if (twin == null) {
+                        syncDao.upsertTrip(trip.copy(id = 0L).toEntity())
+                    } else {
+                        takenTwins += twin.id
+                        // 같은 여행이니 uid를 맞춘다. 내용은 나중에 고친 쪽을 남긴다.
+                        val winner = if (trip.updatedAt >= twin.updatedAt) trip else twin
+                        syncDao.upsertTrip(winner.copy(id = twin.id, uid = trip.uid).toEntity())
+                    }
+                }
+            }
             pulled++
         }
         outcome.removedUids.forEach { syncDao.deleteTripByUid(it) }
