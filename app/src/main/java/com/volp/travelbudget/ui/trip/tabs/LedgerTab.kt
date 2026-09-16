@@ -29,6 +29,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,7 +84,9 @@ fun LedgerTab(
     val summary = state.summary ?: return
     var editingSettlement by remember { mutableStateOf(false) }
     var addingTopUp by remember { mutableStateOf(false) }
-    var filter by remember { mutableStateOf(ExpenseFilter()) }
+    // 지출을 고치러 갔다 돌아와도 걸어 둔 조건이 남는다. 돌아올 때마다 다시 고르게 하면
+    // 조건은 있으나 마나다.
+    var filter by rememberSaveable(stateSaver = ExpenseFilterSaver) { mutableStateOf(ExpenseFilter()) }
     val filtered = remember(state.expenses, filter) { ExpenseFilterResult.of(state.expenses, filter) }
 
     LazyColumn(
@@ -669,6 +673,40 @@ private fun ExpenseSearchBar(filter: ExpenseFilter, onChange: (ExpenseFilter) ->
         }
     }
 }
+
+/**
+ * 걸어 둔 조건을 화면이 사라져도 들고 있게 한다.
+ *
+ * 조건은 도메인 값이라 그대로는 저장되지 않는다. 문자열과 수로 풀어 두었다가 돌아올 때 되돌린다.
+ */
+private val ExpenseFilterSaver = listSaver<ExpenseFilter, Any>(
+    save = { filter ->
+        listOf(
+            filter.query,
+            filter.categories.joinToString(",") { it.name },
+            filter.methods.joinToString(",") { it.name },
+            filter.from?.toString().orEmpty(),
+            filter.to?.toString().orEmpty(),
+            filter.minAmountKrw,
+        )
+    },
+    restore = { saved ->
+        ExpenseFilter(
+            query = saved[0] as String,
+            categories = (saved[1] as String).split(",")
+                .filter { it.isNotBlank() }
+                .map { ExpenseCategory.fromName(it) }
+                .toSet(),
+            methods = (saved[2] as String).split(",")
+                .filter { it.isNotBlank() }
+                .map { PaymentMethod.fromName(it) }
+                .toSet(),
+            from = (saved[3] as String).takeIf { it.isNotBlank() }?.let(LocalDate::parse),
+            to = (saved[4] as String).takeIf { it.isNotBlank() }?.let(LocalDate::parse),
+            minAmountKrw = saved[5] as Long,
+        )
+    },
+)
 
 /** 눌렀을 때 켜고 끄기. 조건 칩은 늘 이렇게 움직인다. */
 private fun <T> Set<T>.toggle(value: T): Set<T> =

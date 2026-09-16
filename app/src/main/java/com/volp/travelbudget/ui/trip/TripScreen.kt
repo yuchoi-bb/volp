@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,6 +93,10 @@ fun TripScreen(
     var selectedTab by rememberSaveable(tripId) { mutableIntStateOf(startTab.coerceIn(0, tabs.lastIndex)) }
     var confirmDelete by remember { mutableStateOf(false) }
 
+    // 탭마다 제 상태를 들고 있게 한다. 가계부에 걸어 둔 조건이 다른 탭에 다녀왔다고 풀리면
+    // 탭이 아니라 다시 여는 화면이 된다.
+    val tabStates = rememberSaveableStateHolder()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -132,42 +137,44 @@ fun TripScreen(
         }
 
         Box(Modifier.fillMaxSize().padding(padding)) {
-            when (selectedTab) {
-                0 -> TodayTab(
-                    state = state,
-                    onRefreshLocation = viewModel::refreshLocation,
-                    onQuickExpense = onQuickExpense,
-                )
+            tabStates.SaveableStateProvider(selectedTab) {
+                when (selectedTab) {
+                    0 -> TodayTab(
+                        state = state,
+                        onRefreshLocation = viewModel::refreshLocation,
+                        onQuickExpense = onQuickExpense,
+                    )
 
-                1 -> ScheduleTab(
-                    state = state,
-                    onAddStop = viewModel::addStop,
-                    onDeleteStop = viewModel::deleteStop,
-                    onMoveStop = viewModel::moveStop,
-                    onAddBooking = onAddBooking,
-                    onEditBooking = onEditBooking,
-                )
+                    1 -> ScheduleTab(
+                        state = state,
+                        onAddStop = viewModel::addStop,
+                        onDeleteStop = viewModel::deleteStop,
+                        onMoveStop = viewModel::moveStop,
+                        onAddBooking = onAddBooking,
+                        onEditBooking = onEditBooking,
+                    )
 
-                2 -> LedgerTab(
-                    state = state,
-                    onAddExpense = onAddExpense,
-                    onEditExpense = onEditExpense,
-                    onDeleteExpense = viewModel::deleteExpense,
-                    onEditBudget = onEditBudget,
-                    onOpenStats = onOpenStats,
-                    onApplySettlement = viewModel::applySettlement,
-                    onImportSms = onImportSms,
-                    onAddTopUp = viewModel::addTopUp,
-                    onDeleteTopUp = viewModel::deleteTopUp,
-                )
+                    2 -> LedgerTab(
+                        state = state,
+                        onAddExpense = onAddExpense,
+                        onEditExpense = onEditExpense,
+                        onDeleteExpense = viewModel::deleteExpense,
+                        onEditBudget = onEditBudget,
+                        onOpenStats = onOpenStats,
+                        onApplySettlement = viewModel::applySettlement,
+                        onImportSms = onImportSms,
+                        onAddTopUp = viewModel::addTopUp,
+                        onDeleteTopUp = viewModel::deleteTopUp,
+                    )
 
-                else -> RecordTab(
-                    state = state,
-                    onLoadDevicePhotos = viewModel::loadDevicePhotos,
-                    onAttachPhotos = viewModel::attachPhotos,
-                    onSaveNote = viewModel::saveNote,
-                    onTogglePacking = viewModel::togglePacking,
-                )
+                    else -> RecordTab(
+                        state = state,
+                        onLoadDevicePhotos = viewModel::loadDevicePhotos,
+                        onAttachPhotos = viewModel::attachPhotos,
+                        onSaveNote = viewModel::saveNote,
+                        onTogglePacking = viewModel::togglePacking,
+                    )
+                }
             }
         }
     }
