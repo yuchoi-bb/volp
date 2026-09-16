@@ -57,6 +57,13 @@ data class SyncSnapshot(
     val purchases: List<PurchaseRecord> = emptyList(),
     val deletions: List<DeletionEntity> = emptyList(),
 ) {
+    /** 이 한 벌에 담긴 기록 수. 파일을 주고받을 때 몇 건인지 말해 주려고 쓴다. */
+    val recordCount: Int
+        get() = trips.sumOf { bundle ->
+            1 + bundle.expenses.size + bundle.bookings.size + bundle.stops.size +
+                bundle.notes.size + bundle.packing.size + bundle.cash.size
+        } + purchases.size
+
     companion object {
         const val FORMAT_VERSION = 4
         const val FILE_NAME = "volp-backup.json"

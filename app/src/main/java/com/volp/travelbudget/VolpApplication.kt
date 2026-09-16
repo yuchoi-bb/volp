@@ -27,6 +27,7 @@ import com.volp.travelbudget.widget.TodayWidgetProvider
 import com.volp.travelbudget.data.settings.AppSettings
 import com.volp.travelbudget.data.sync.FirestoreSync
 import com.volp.travelbudget.data.sync.SyncEngine
+import com.volp.travelbudget.data.transfer.RecordTransfer
 import com.volp.travelbudget.data.sync.SyncWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -90,6 +91,9 @@ class VolpApplication : Application() {
     }
 
     val backupManager: BackupManager by lazy { BackupManager(syncEngine, settings) }
+
+    /** 계정 없이 파일 하나로 다른 기기와 기록을 주고받는다. */
+    val recordTransfer: RecordTransfer by lazy { RecordTransfer(this, syncEngine) }
 
     /** 다른 안드로이드 기기와 기록을 맞춘다. */
     val firestoreSync: FirestoreSync by lazy {

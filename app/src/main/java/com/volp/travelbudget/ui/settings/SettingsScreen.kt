@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -81,6 +82,36 @@ fun SettingsScreen(
     val syncState by syncViewModel.state.collectAsStateWithLifecycle()
     val syncStatus by syncViewModel.status.collectAsStateWithLifecycle()
     var codeInput by remember { mutableStateOf("") }
+
+    val transferViewModel: RecordTransferViewModel = viewModel(
+        factory = volpViewModelFactory { app -> RecordTransferViewModel(app.recordTransfer) },
+    )
+    val transferStatus by transferViewModel.status.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    val saveFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri -> uri?.let(transferViewModel::exportTo) }
+
+    // 다른 앱이 붙여 주는 이름이 제각각이라 json으로만 좁히면 고르지 못하는 파일이 생긴다.
+    val openFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let(transferViewModel::importFrom) }
+
+    // 파일이 만들어지면 곧바로 보내기 화면을 띄운다. 어디로 보낼지는 안드로이드가 묻는다.
+    LaunchedEffect(transferStatus) {
+        val ready = transferStatus as? TransferStatus.ReadyToSend ?: return@LaunchedEffect
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_STREAM, ready.uri)
+            putExtra(Intent.EXTRA_SUBJECT, "볼프 기록")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        runCatching {
+            context.startActivity(Intent.createChooser(send, "기록 보내기"))
+        }
+        transferViewModel.sent(ready.message)
+    }
 
     val consentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
@@ -359,6 +390,66 @@ fun SettingsScreen(
                 }
             }
 
+            SectionCard("파일로 주고받기") {
+                Text(
+                    "기록을 파일 하나로 내보내 다른 기기에서 가져온다. 계정도 인터넷도 필요 없어서 " +
+                        "해외에서 데이터가 안 되거나 기기를 바꿀 때 쓴다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "받은 파일은 덮어쓰지 않고 합친다. 두 기기에서 따로 넣은 것이 둘 다 남고, " +
+                        "같은 기록은 나중에 고친 쪽이 남는다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = transferViewModel::prepareSend,
+                        enabled = transferStatus !is TransferStatus.Working,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("보내기") }
+                    OutlinedButton(
+                        onClick = { saveFileLauncher.launch(transferViewModel.suggestedFileName()) },
+                        enabled = transferStatus !is TransferStatus.Working,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("파일로 저장") }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { openFileLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                    enabled = transferStatus !is TransferStatus.Working,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("받은 파일 가져오기") }
+
+                when (val status = transferStatus) {
+                    is TransferStatus.Working -> {
+                        Spacer(Modifier.height(12.dp))
+                        Text(status.message, style = MaterialTheme.typography.bodySmall)
+                    }
+                    is TransferStatus.Done -> {
+                        Spacer(Modifier.height(12.dp))
+                        Text(status.message, style = MaterialTheme.typography.bodySmall)
+                    }
+                    is TransferStatus.Failed -> {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            status.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    is TransferStatus.ReadyToSend, TransferStatus.Idle -> Unit
+                }
+            }
+
             SectionCard("백업") {
                 ToggleRow(
                     label = "Google Drive 자동 백업",
@@ -413,7 +504,6 @@ fun SettingsScreen(
                     },
                 )
 
-                val context = LocalContext.current
                 val sha1 = remember { BuildIdentity.signingSha1(context) }
                 if (sha1 != null) {
                     Spacer(Modifier.height(10.dp))
