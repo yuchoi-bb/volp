@@ -37,16 +37,6 @@
             </intent-filter>
         </service>
 
-        <!-- 내려받은 APK를 설치 화면에 넘겨주기 위한 통로. -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.updates"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
     </application>
 
 </manifest>

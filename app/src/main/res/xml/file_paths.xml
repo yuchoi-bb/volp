@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <!-- 내려받은 APK를 설치 화면에 넘겨주는 자리. -->
     <cache-path name="updates" path="updates/" />
+    <!-- 기록을 파일로 내보내 다른 앱에 넘기는 자리. -->
+    <cache-path name="share" path="share/" />
 </paths>

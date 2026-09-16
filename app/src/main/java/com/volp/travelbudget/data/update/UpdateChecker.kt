@@ -105,7 +105,7 @@ class UpdateChecker(
     fun install(file: File) {
         val uri: Uri = FileProvider.getUriForFile(
             context,
-            "${context.packageName}.updates",
+            "${context.packageName}.files",
             file,
         )
         val intent = Intent(Intent.ACTION_VIEW).apply {

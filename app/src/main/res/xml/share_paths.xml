@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<paths>
-    <!-- 기록 파일을 잠깐 두고 보내기 화면에 넘기는 자리. -->
-    <cache-path name="share" path="share/" />
-</paths>

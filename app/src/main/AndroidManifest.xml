@@ -88,15 +88,18 @@
                 android:resource="@xml/widget_today_info" />
         </receiver>
 
-        <!-- 기록 파일을 다른 앱으로 보낼 때만 쓰는 자리. 잠깐 읽을 권한만 준다. -->
+        <!--
+            앱이 만든 파일을 다른 앱에 잠깐 넘길 때 쓰는 자리. 내려받은 APK와 내보낸 기록이
+            여기를 지난다. FileProvider는 클래스 이름으로 합쳐지므로 앱에 하나만 둔다.
+        -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.share"
+            android:authorities="${applicationId}.files"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/share_paths" />
+                android:resource="@xml/file_paths" />
         </provider>
 
     </application>

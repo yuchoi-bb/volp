@@ -53,7 +53,7 @@ class RecordTransfer(
         val file = File(folder, fileName())
         file.writeText(SyncCodec.toJson(snapshot))
 
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.share", file)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         uri to TransferCount(snapshot.trips.size, snapshot.recordCount)
     }
 
