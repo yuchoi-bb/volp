@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Payments
@@ -73,6 +74,7 @@ fun TripScreen(
     onOpenStats: () -> Unit,
     onImportSms: () -> Unit,
     onImportPlan: () -> Unit,
+    onReschedule: () -> Unit,
     onAddBooking: (LocalDate) -> Unit,
     onEditBooking: (Long) -> Unit,
     onDeleted: () -> Unit,
@@ -116,6 +118,9 @@ fun TripScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onReschedule) {
+                        Icon(Icons.Default.EditCalendar, contentDescription = "여행 날짜 바꾸기")
+                    }
                     IconButton(onClick = viewModel::refreshLocation) {
                         Icon(Icons.Default.MyLocation, contentDescription = "현재 위치 확인")
                     }

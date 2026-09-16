@@ -68,6 +68,9 @@ interface ItineraryDao {
     @Query("SELECT * FROM itinerary_stops WHERE tripId = :tripId AND date = :date ORDER BY sortOrder")
     suspend fun observeStopsOnce(tripId: Long, date: LocalDate): List<ItineraryStopEntity>
 
+    @Query("SELECT * FROM itinerary_stops WHERE tripId = :tripId ORDER BY date, sortOrder")
+    suspend fun stopsOf(tripId: Long): List<ItineraryStopEntity>
+
     @Query("SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM itinerary_stops WHERE tripId = :tripId AND date = :date")
     suspend fun nextSortOrder(tripId: Long, date: LocalDate): Int
 

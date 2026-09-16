@@ -27,6 +27,7 @@ import com.volp.travelbudget.widget.TodayWidgetProvider
 import com.volp.travelbudget.data.settings.AppSettings
 import com.volp.travelbudget.data.sync.FirestoreSync
 import com.volp.travelbudget.data.sync.SyncEngine
+import com.volp.travelbudget.data.repository.RescheduleRepository
 import com.volp.travelbudget.data.transfer.RecordTransfer
 import com.volp.travelbudget.data.sync.SyncWorker
 import kotlinx.coroutines.CoroutineScope
@@ -91,6 +92,11 @@ class VolpApplication : Application() {
     }
 
     val backupManager: BackupManager by lazy { BackupManager(syncEngine, settings) }
+
+    /** 여행 날짜가 바뀌었을 때 그 안의 일정을 함께 옮긴다. */
+    val rescheduleRepository: RescheduleRepository by lazy {
+        RescheduleRepository(database.tripDao(), database.itineraryDao(), database.bookingDao())
+    }
 
     /** 계정 없이 파일 하나로 다른 기기와 기록을 주고받는다. */
     val recordTransfer: RecordTransfer by lazy { RecordTransfer(this, syncEngine) }

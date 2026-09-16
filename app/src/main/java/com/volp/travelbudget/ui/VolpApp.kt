@@ -34,6 +34,7 @@ import com.volp.travelbudget.ui.settings.SettingsScreen
 import com.volp.travelbudget.ui.plan.PlanImportScreen
 import com.volp.travelbudget.ui.smsimport.SmsImportScreen
 import com.volp.travelbudget.ui.stats.TripStatsScreen
+import com.volp.travelbudget.ui.trip.RescheduleScreen
 import com.volp.travelbudget.ui.trip.TripScreen
 import com.volp.travelbudget.ui.trips.TripListScreen
 import com.volp.travelbudget.ui.update.UpdatePrompt
@@ -56,6 +57,7 @@ object Routes {
     fun quickExpense(tripId: Long = 0L) = "quick?tripId=$tripId"
     fun smsImport(tripId: Long) = "trips/$tripId/sms-import"
     fun planImport(tripId: Long) = "trips/$tripId/plan-import"
+    fun reschedule(tripId: Long) = "trips/$tripId/reschedule"
     fun purchaseEditor(purchaseId: Long = 0L, tripId: Long = 0L) =
         "purchases/editor?purchaseId=$purchaseId&tripId=$tripId"
     fun bookingEditor(tripId: Long, bookingId: Long = 0L, date: LocalDate? = null) =
@@ -70,6 +72,7 @@ object Routes {
     const val PURCHASE_EDITOR_PATTERN = "purchases/editor?purchaseId={purchaseId}&tripId={tripId}"
     const val SMS_IMPORT_PATTERN = "trips/{tripId}/sms-import"
     const val PLAN_IMPORT_PATTERN = "trips/{tripId}/plan-import"
+    const val RESCHEDULE_PATTERN = "trips/{tripId}/reschedule"
 }
 
 @Composable
@@ -195,6 +198,7 @@ fun VolpApp(
                     onOpenStats = { navController.navigate(Routes.stats(tripId)) },
                     onImportSms = { navController.navigate(Routes.smsImport(tripId)) },
                     onImportPlan = { navController.navigate(Routes.planImport(tripId)) },
+                    onReschedule = { navController.navigate(Routes.reschedule(tripId)) },
                     onAddBooking = { date -> navController.navigate(Routes.bookingEditor(tripId, date = date)) },
                     onEditBooking = { navController.navigate(Routes.bookingEditor(tripId, bookingId = it)) },
                     onDeleted = { navController.popBackStack() },
@@ -266,6 +270,16 @@ fun VolpApp(
                 arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
             ) { entry ->
                 PlanImportScreen(
+                    tripId = entry.arguments?.getLong("tripId") ?: 0L,
+                    onDone = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Routes.RESCHEDULE_PATTERN,
+                arguments = listOf(navArgument("tripId") { type = NavType.LongType }),
+            ) { entry ->
+                RescheduleScreen(
                     tripId = entry.arguments?.getLong("tripId") ?: 0L,
                     onDone = { navController.popBackStack() },
                 )
