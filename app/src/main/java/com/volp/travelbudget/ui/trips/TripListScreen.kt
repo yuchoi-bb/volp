@@ -212,14 +212,16 @@ private fun SortRow(
             }
         }
 
-        if (selected.draggable) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "카드를 길게 눌러 끌면 자리를 바꿀 수 있다.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (selected.draggable) {
+                "카드를 길게 눌러 끌면 자리를 바꿀 수 있다."
+            } else {
+                "'내 순서'를 고르면 카드를 끌어 자리를 정할 수 있다."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
