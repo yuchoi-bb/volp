@@ -280,6 +280,16 @@ class TripViewModel(
         viewModelScope.launch { itineraryRepository.move(stop, up) }
     }
 
+    /** 다른 날로 옮긴다. */
+    fun moveStopToDate(stop: ItineraryStop, date: LocalDate) {
+        viewModelScope.launch { itineraryRepository.moveToDate(stop, date) }
+    }
+
+    /** 하루 정리에서 고른 차례를 저장한다. */
+    fun applyDayOrder(date: LocalDate, orderedIds: List<Long>) {
+        viewModelScope.launch { itineraryRepository.reorder(tripId, date, orderedIds) }
+    }
+
     fun deleteBooking(bookingId: Long) {
         viewModelScope.launch { bookingRepository.delete(bookingId) }
     }

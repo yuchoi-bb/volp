@@ -80,6 +80,31 @@ class ItineraryRepository(
         dao.update(other.copy(sortOrder = current.sortOrder, updatedAt = now))
     }
 
+    /**
+     * 다른 날로 옮긴다.
+     *
+     * 옮긴 날의 맨 뒤에 붙는다. 시각이 적힌 것은 그 시각 자리에 알아서 서므로 뒤에 붙여도 된다.
+     */
+    suspend fun moveToDate(stop: ItineraryStop, date: LocalDate) {
+        if (stop.date == date) return
+        dao.update(
+            stop.copy(
+                date = date,
+                sortOrder = dao.nextSortOrder(stop.tripId, date),
+            ).stamped().toEntity(),
+        )
+    }
+
+    /** 정리한 차례를 그대로 저장한다. */
+    suspend fun reorder(tripId: Long, date: LocalDate, orderedIds: List<Long>) {
+        val byId = dao.observeStopsOnce(tripId, date).associateBy { it.id }
+        val now = SyncIds.now()
+        orderedIds.forEachIndexed { index, id ->
+            val stop = byId[id] ?: return@forEachIndexed
+            if (stop.sortOrder != index) dao.update(stop.copy(sortOrder = index, updatedAt = now))
+        }
+    }
+
     fun observePackingChecks(tripId: Long): Flow<Set<String>> =
         dao.observePackingChecks(tripId).map { checks ->
             checks.filter { it.checked }.map { it.itemName }.toSet()

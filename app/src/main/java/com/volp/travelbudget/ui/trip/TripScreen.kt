@@ -183,6 +183,8 @@ fun TripScreen(
                             onAddBooking = onAddBooking,
                             onEditBooking = onEditBooking,
                             onImportPlan = onImportPlan,
+                            onMoveStopToDate = viewModel::moveStopToDate,
+                            onApplyDayOrder = viewModel::applyDayOrder,
                         )
 
                         2 -> LedgerTab(
