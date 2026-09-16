@@ -355,6 +355,7 @@ private fun StopCard(
     canMoveDown: Boolean,
     onDelete: () -> Unit,
     onMove: (Boolean) -> Unit,
+    onMoveToDate: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -391,6 +392,9 @@ private fun StopCard(
                         },
                     )
                 }
+            }
+            IconButton(onClick = onMoveToDate) {
+                Icon(Icons.Default.EditCalendar, contentDescription = "다른 날로 옮기기")
             }
             IconButton(onClick = { onMove(true) }, enabled = canMoveUp) {
                 Icon(Icons.Default.KeyboardArrowUp, contentDescription = "위로")
