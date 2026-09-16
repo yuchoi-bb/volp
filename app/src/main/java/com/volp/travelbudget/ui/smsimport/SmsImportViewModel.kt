@@ -7,6 +7,8 @@ import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.domain.cardsms.CardMessageBatch
 import com.volp.travelbudget.domain.cardsms.CardMessageParser
 import com.volp.travelbudget.domain.cardsms.CardTransaction
+import com.volp.travelbudget.domain.cardsms.ImportGroup
+import com.volp.travelbudget.domain.cardsms.ImportGrouping
 import com.volp.travelbudget.domain.cardsms.PretripBookings
 import com.volp.travelbudget.domain.cardsms.PretripKind
 import com.volp.travelbudget.domain.model.ExpenseCategory
@@ -28,6 +30,10 @@ data class SmsImportRow(
     val alreadyThere: Boolean,
     /** 여행 전에 미리 결제한 예약이면 그 갈래. 여행 기간 안의 결제면 null. */
     val pretripKind: PretripKind? = null,
+    /** 어느 묶음에 놓을지. */
+    val group: ImportGroup = ImportGroup.ONSITE,
+    /** 가맹점 이름이 여행 것으로 읽히는지. 고민되는 묶음에서 근거로 보여 준다. */
+    val looksLikeTravel: Boolean = false,
 ) {
     val key: String
         get() = listOf(
@@ -73,6 +79,8 @@ data class SmsImportState(
     val canSave: Boolean get() = tripId != null && selected.isNotEmpty()
 
     val trip: Trip? get() = trips.firstOrNull { it.id == tripId }
+
+    fun rowsIn(group: ImportGroup): List<SmsImportRow> = rows.filter { it.group == group }
 }
 
 /**
@@ -103,17 +111,18 @@ class SmsImportViewModel(
             val trips = repository.tripsOnce()
             val target = tripId ?: trips.firstOrNull()?.id
 
+            val targetTrip = trips.firstOrNull { it.id == target }
             val transactions = when {
                 !sharedText.isNullOrBlank() ->
                     CardMessageBatch.parseAll(sharedText, LocalDateTime.now())
-                target != null -> scanInbox(trips.firstOrNull { it.id == target })
+                target != null -> scanInbox(targetTrip)
                 else -> emptyList()
             }
 
             val scanning = sharedText.isNullOrBlank()
             _state.value = SmsImportState(
                 loading = false,
-                rows = transactions.map { row(it, target) },
+                rows = transactions.map { row(it, targetTrip) },
                 trips = trips,
                 tripId = target,
                 needsPermission = scanning && !inbox.canRead,
@@ -135,19 +144,40 @@ class SmsImportViewModel(
             .distinctBy { "${it.occurredAt}|${it.amount}|${it.merchant}" }
     }
 
-    private suspend fun row(transaction: CardTransaction, tripId: Long?): SmsImportRow {
+    private suspend fun row(
+        transaction: CardTransaction,
+        trip: Trip?,
+        pretripKind: PretripKind? = null,
+    ): SmsImportRow {
         val resolved = repository.resolveMerchant(transaction.merchant)
         val amountKrw = if (transaction.isOverseas) 0L else transaction.signedAmount.toLong()
-        val already = tripId != null && amountKrw != 0L &&
-            repository.hasExpenseLike(tripId, transaction.occurredAt.toLocalDate(), amountKrw)
+        val already = trip != null && amountKrw != 0L &&
+            repository.hasExpenseLike(trip.id, transaction.occurredAt.toLocalDate(), amountKrw)
+
+        val kind = pretripKind ?: PretripBookings.kindOf(transaction.merchant)
+        val group = ImportGrouping.groupFor(
+            tripCurrencyCode = trip?.currencyCode ?: "KRW",
+            isOverseas = transaction.isOverseas,
+            pretrip = pretripKind != null,
+        )
+        val travelish = ImportGrouping.looksLikeTravel(transaction.merchant)
+        // 공유로 들어온 글은 사람이 이미 골라 보낸 것이다. 그것까지 꺼 두면 두 번 고르게 된다.
+        val checked = if (sharedText.isNullOrBlank()) {
+            ImportGrouping.checkedByDefault(group, already, travelish)
+        } else {
+            !already
+        }
 
         return SmsImportRow(
             transaction = transaction,
             merchant = resolved.displayName,
-            category = resolved.category ?: ExpenseCategory.ETC,
-            // 이미 있는 것은 꺼 둔다. 사람이 굳이 다시 넣겠다면 켜면 된다.
-            checked = !already,
+            // 가맹점 사전이 모르는 이름이라도 예약으로 읽히면 그 항목을 미리 채운다.
+            category = resolved.category ?: kind?.category ?: ExpenseCategory.ETC,
+            checked = checked,
             alreadyThere = already,
+            pretripKind = pretripKind,
+            group = group,
+            looksLikeTravel = travelish,
         )
     }
 
@@ -186,14 +216,7 @@ class SmsImportViewModel(
 
             val already = _state.value.rows.map { it.key }.toSet()
             val rows = found
-                .map { (transaction, kind) ->
-                    val base = row(transaction, trip.id)
-                    base.copy(
-                        pretripKind = kind,
-                        // 가맹점 사전이 이미 항목을 알고 있으면 그것을 지킨다.
-                        category = if (base.category == ExpenseCategory.ETC) kind.category else base.category,
-                    )
-                }
+                .map { (transaction, kind) -> row(transaction, trip, kind) }
                 .filterNot { it.key in already }
 
             _state.update { state ->
@@ -222,20 +245,23 @@ class SmsImportViewModel(
         current.copy(rows = current.rows.map { it.copy(checked = checked) })
     }
 
+    fun checkGroup(group: ImportGroup, checked: Boolean) = _state.update { current ->
+        current.copy(
+            rows = current.rows.map { if (it.group == group) it.copy(checked = checked) else it },
+        )
+    }
+
     fun setTrip(id: Long) {
         // 여행이 바뀌면 여행 전 구간도 달라지므로 다시 찾을 수 있게 둔다.
         _state.update { it.copy(tripId = id, pretrip = it.pretrip.copy(done = false, found = 0)) }
         // 여행이 바뀌면 '이미 있는 것'도 달라진다.
         viewModelScope.launch {
             val current = _state.value
+            val trip = current.trip
             val rows = current.rows.map { existing ->
-                val refreshed = row(existing.transaction, current.tripId)
+                val refreshed = row(existing.transaction, trip, existing.pretripKind)
                 // 사람이 손으로 고른 항목과 체크는 지킨다.
-                refreshed.copy(
-                    category = existing.category,
-                    checked = existing.checked,
-                    pretripKind = existing.pretripKind,
-                )
+                refreshed.copy(category = existing.category, checked = existing.checked)
             }
             _state.update { it.copy(rows = rows) }
         }

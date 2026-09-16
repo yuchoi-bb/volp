@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.BuildConfig
+import com.volp.travelbudget.domain.cardsms.ImportGroup
 import com.volp.travelbudget.domain.cardsms.PretripBookings
 import com.volp.travelbudget.domain.model.ExpenseCategory
 import com.volp.travelbudget.ui.common.SectionCard
@@ -184,16 +185,66 @@ fun SmsImportScreen(
                 }
             }
 
-            items(state.rows, key = { it.key }) { row ->
-                ImportRow(
-                    row = row,
-                    onToggle = { viewModel.toggle(row.key) },
-                    onCategory = { viewModel.setCategory(row.key, it) },
-                )
+            // 묶음마다 제목을 달아 나눈다. 특히 '고민되는 결제'는 섞어 놓으면 가릴 수 없다.
+            ImportGroup.entries.forEach { group ->
+                val rows = state.rowsIn(group)
+                if (rows.isEmpty()) return@forEach
+
+                item(key = "head-${group.name}") {
+                    GroupHeader(
+                        group = group,
+                        count = rows.size,
+                        allChecked = rows.all { it.checked },
+                        onCheckAll = { viewModel.checkGroup(group, it) },
+                    )
+                }
+
+                items(rows, key = { it.key }) { row ->
+                    ImportRow(
+                        row = row,
+                        onToggle = { viewModel.toggle(row.key) },
+                        onCategory = { viewModel.setCategory(row.key, it) },
+                    )
+                }
             }
 
             item(key = "space") { Spacer(Modifier.height(16.dp)) }
         }
+    }
+}
+
+/** 묶음의 제목 줄. 무엇을 모아 둔 자리인지 말하고, 한 번에 켜고 끄게 한다. */
+@Composable
+private fun GroupHeader(
+    group: ImportGroup,
+    count: Int,
+    allChecked: Boolean,
+    onCheckAll: (Boolean) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${group.title} ${count}건",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            TextButton(onClick = { onCheckAll(!allChecked) }) {
+                Text(if (allChecked) "모두 끄기" else "모두 켜기")
+            }
+        }
+        Text(
+            group.note,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (group == ImportGroup.UNCERTAIN) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
     }
 }
 
@@ -328,6 +379,13 @@ private fun ImportRow(
                     row.pretripKind?.let { kind ->
                         Text(
                             "여행 전 예약 · ${kind.label}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    if (row.group == ImportGroup.UNCERTAIN && row.looksLikeTravel) {
+                        Text(
+                            "여행 것으로 보인다",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
