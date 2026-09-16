@@ -2,6 +2,7 @@
 
 package com.volp.travelbudget.ui.expense
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -37,6 +39,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.Box
@@ -95,12 +100,48 @@ fun ExpenseEditorScreen(
         if (state.saved) onDone()
     }
 
+    // 고친 것을 말없이 버리지 않는다. 남아 있으면 나가기 전에 한 번 묻는다.
+    var confirmExit by remember { mutableStateOf(false) }
+    val leave: () -> Unit = {
+        if (viewModel.hasUnsavedChanges) {
+            confirmExit = true
+        } else {
+            onDone()
+        }
+    }
+    BackHandler { leave() }
+
+    if (confirmExit) {
+        AlertDialog(
+            onDismissRequest = { confirmExit = false },
+            title = { Text("저장하지 않고 나갈까요") },
+            text = { Text("고친 내용이 아직 저장되지 않았다.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmExit = false
+                        viewModel.save()
+                    },
+                    enabled = state.canSave,
+                ) { Text("저장하고 나가기") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        confirmExit = false
+                        onDone()
+                    },
+                ) { Text("그냥 나가기") }
+            },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(if (state.isEditing) "지출 수정" else "지출 입력") },
                 navigationIcon = {
-                    IconButton(onClick = onDone) {
+                    IconButton(onClick = leave) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
                     }
                 },

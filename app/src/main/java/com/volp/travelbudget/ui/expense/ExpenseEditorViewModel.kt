@@ -47,6 +47,17 @@ data class ExpenseEditorUiState(
     val originalAmount: Double? get() = if (useLocalCurrency) amount else null
 
     val canSave: Boolean get() = amount != 0.0
+
+    /** 사용자가 손댈 수 있는 값만 견준다. 불러오는 중이었는지, 저장했는지는 뺀다. */
+    fun sameContentAs(other: ExpenseEditorUiState): Boolean =
+        category == other.category &&
+            date == other.date &&
+            memo == other.memo &&
+            useLocalCurrency == other.useLocalCurrency &&
+            currencyCode == other.currencyCode &&
+            exchangeRate == other.exchangeRate &&
+            amountInput == other.amountInput &&
+            method == other.method
 }
 
 class ExpenseEditorViewModel(
@@ -78,6 +89,22 @@ class ExpenseEditorViewModel(
     /** 아직 저장 전이라 붙일 곳이 없는 사진. 저장할 때 함께 붙인다. */
     private val _queuedReceipts = MutableStateFlow<List<Uri>>(emptyList())
     val queuedReceipts: StateFlow<List<Uri>> = _queuedReceipts.asStateFlow()
+
+    /** 불러온 직후의 값. 나갈 때 무엇이 바뀌었는지 이것과 견준다. */
+    private var loaded: ExpenseEditorUiState? = null
+
+    /**
+     * 저장하지 않은 고침이 남아 있는지.
+     *
+     * 뒤로 가기를 누른 그 순간에만 본다. 아직 못 불러왔거나 방금 저장했으면 물어볼 것이 없다.
+     */
+    val hasUnsavedChanges: Boolean
+        get() {
+            val base = loaded ?: return false
+            val current = _state.value
+            if (current.loading || current.saved) return false
+            return !current.sameContentAs(base) || _queuedReceipts.value.isNotEmpty()
+        }
 
     init {
         viewModelScope.launch {
@@ -114,6 +141,7 @@ class ExpenseEditorViewModel(
                     exchangeRate = tripRate,
                 )
             }
+            loaded = _state.value
         }
     }
 

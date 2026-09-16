@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,7 +88,8 @@ fun TripScreen(
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var selectedTab by remember { mutableIntStateOf(startTab.coerceIn(0, tabs.lastIndex)) }
+    // 지출을 고치러 갔다 돌아왔을 때 보던 탭 그대로 열린다.
+    var selectedTab by rememberSaveable(tripId) { mutableIntStateOf(startTab.coerceIn(0, tabs.lastIndex)) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     Scaffold(
