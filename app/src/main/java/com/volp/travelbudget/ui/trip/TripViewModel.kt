@@ -55,6 +55,8 @@ data class TripUiState(
     val packingItems: List<PackingItem> = emptyList(),
     val checkedItems: Set<String> = emptySet(),
     val cashTopUps: List<CashTopUp> = emptyList(),
+    /** 예약마다 붙어 있는 티켓 사진 수. */
+    val ticketCounts: Map<Long, Int> = emptyMap(),
     val currentLocation: GeoPoint? = null,
     val rainAlert: RainAlert? = null,
     val loadingWeather: Boolean = false,
@@ -122,7 +124,8 @@ class TripViewModel(
         photoStore.observeSaved(tripId),
         itineraryRepository.observePackingChecks(tripId),
         cashRepository.observeTopUps(tripId),
-    ) { photos, checks, cash -> Record(photos, checks, cash) }
+        photoStore.observeBookingPhotoCounts(tripId),
+    ) { photos, checks, cash, tickets -> Record(photos, checks, cash, tickets) }
 
     private val live = combine(
         forecasts,
@@ -154,6 +157,7 @@ class TripViewModel(
             packingItems = if (trip == null) emptyList() else PackingAdvisor.suggest(trip, v.forecasts),
             checkedItems = r.checks,
             cashTopUps = r.cash,
+            ticketCounts = r.tickets,
             currentLocation = v.location,
             rainAlert = v.rain,
             loadingWeather = v.loadingWeather,
@@ -357,6 +361,8 @@ class TripViewModel(
         val photos: List<TripPhoto>,
         val checks: Set<String>,
         val cash: List<CashTopUp>,
+        /** 예약마다 붙어 있는 티켓 사진 수. */
+        val tickets: Map<Long, Int>,
     )
 
     private data class Live(

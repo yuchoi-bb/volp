@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -131,6 +132,7 @@ fun ScheduleTab(
                 when (entry) {
                     is PlanEntry.Reservation -> BookingCard(
                         entry = entry,
+                        tickets = state.ticketCounts[entry.booking.id] ?: 0,
                         onEdit = { onEditBooking(entry.booking.id) },
                     )
 
@@ -241,7 +243,7 @@ private fun initialDate(state: TripUiState): LocalDate {
 }
 
 @Composable
-private fun BookingCard(entry: PlanEntry.Reservation, onEdit: () -> Unit) {
+private fun BookingCard(entry: PlanEntry.Reservation, tickets: Int, onEdit: () -> Unit) {
     val booking = entry.booking
 
     Card(
@@ -262,6 +264,15 @@ private fun BookingCard(entry: PlanEntry.Reservation, onEdit: () -> Unit) {
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 표를 넣어 두었는지 여기서 바로 보인다. 개표대 앞에서 찾을 것이 아니다.
+                    if (tickets > 0) {
+                        Text(
+                            "🎫 ${tickets}장",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
                     if (booking.confirmationCode.isNotBlank()) {
                         Text(booking.confirmationCode, style = MaterialTheme.typography.labelMedium)
                     }

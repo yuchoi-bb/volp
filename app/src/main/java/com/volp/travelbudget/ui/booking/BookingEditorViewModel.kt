@@ -2,6 +2,9 @@ package com.volp.travelbudget.ui.booking
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
+import com.volp.travelbudget.data.photos.PhotoStore
+import com.volp.travelbudget.data.photos.TripPhoto
 import com.volp.travelbudget.data.repository.BookingRepository
 import com.volp.travelbudget.data.repository.TripRepository
 import com.volp.travelbudget.data.travel.PlaceLookup
@@ -15,6 +18,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -54,6 +59,7 @@ class BookingEditorViewModel(
     private val bookingRepository: BookingRepository,
     private val tripRepository: TripRepository,
     private val placeLookup: PlaceLookup,
+    private val photoStore: PhotoStore,
     private val tripId: Long,
     private val bookingId: Long,
     private val defaultDate: LocalDate,
@@ -63,6 +69,57 @@ class BookingEditorViewModel(
 
     private val _state = MutableStateFlow(BookingEditorUiState())
     val state: StateFlow<BookingEditorUiState> = _state.asStateFlow()
+
+    /** 이 예약에 붙어 있는 티켓 사진. */
+    val photos: StateFlow<List<TripPhoto>> =
+        if (bookingId > 0L) {
+            photoStore.observeBookingPhotos(bookingId)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+        } else {
+            MutableStateFlow(emptyList())
+        }
+
+    /** 아직 저장 전이라 붙일 곳이 없는 사진. 저장할 때 함께 붙인다. */
+    private val _queuedPhotos = MutableStateFlow<List<Uri>>(emptyList())
+    val queuedPhotos: StateFlow<List<Uri>> = _queuedPhotos.asStateFlow()
+
+    val photoLimit: Int get() = PhotoStore.MAX_BOOKING_PHOTOS
+
+    fun addPhotos(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        if (bookingId > 0L) {
+            viewModelScope.launch { photoStore.attachToBooking(tripId, bookingId, uris) }
+        } else {
+            _queuedPhotos.update { (it + uris).take(PhotoStore.MAX_BOOKING_PHOTOS) }
+        }
+    }
+
+    fun removePhoto(photoId: Long) {
+        viewModelScope.launch { photoStore.remove(photoId) }
+    }
+
+    fun removeQueuedPhoto(uri: Uri) {
+        _queuedPhotos.update { list -> list.filterNot { it == uri } }
+    }
+
+    /** 보여 줄 차례를 한 칸 옮긴다. */
+    fun movePhoto(photoId: Long, up: Boolean) {
+        if (bookingId <= 0L) return
+        viewModelScope.launch { photoStore.moveBookingPhoto(bookingId, photoId, up) }
+    }
+
+    fun moveQueuedPhoto(uri: Uri, up: Boolean) = _queuedPhotos.update { list ->
+        val index = list.indexOf(uri)
+        val swapWith = if (up) index - 1 else index + 1
+        if (index < 0 || swapWith !in list.indices) {
+            list
+        } else {
+            list.toMutableList().apply {
+                this[index] = list[swapWith]
+                this[swapWith] = list[index]
+            }
+        }
+    }
 
     init {
         viewModelScope.launch {
@@ -136,7 +193,7 @@ class BookingEditorViewModel(
                 .firstOrNull { it.isNotBlank() }
             val point = query?.let { placeLookup.find(it, near)?.point }
 
-            bookingRepository.save(
+            val newId = bookingRepository.save(
                 Booking(
                     id = bookingId,
                     tripId = tripId,
@@ -168,6 +225,9 @@ class BookingEditorViewModel(
                     point = point,
                 ),
             )
+            // 새 예약은 방금 자리가 생겼다. 들고 있던 사진을 이제 붙인다.
+            photoStore.attachToBooking(tripId, newId, _queuedPhotos.value)
+            _queuedPhotos.value = emptyList()
             _state.update { it.copy(saved = true) }
         }
     }
@@ -238,3 +298,4 @@ private fun ParsedBooking.toUiState(defaultDate: LocalDate): BookingEditorUiStat
 /** 메모에 남길 원문 길이. 너무 길면 화면을 다 덮는다. */
 private const val MEMO_LIMIT = 300
 
+private const val STOP_TIMEOUT_MS = 5_000L

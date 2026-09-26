@@ -41,6 +41,14 @@ class PhotoStore(
     fun observeReceipts(expenseId: Long): Flow<List<TripPhoto>> =
         dao.observeByExpense(expenseId).map { list -> list.map { it.toPhoto() } }
 
+    /** 예약 하나에 붙은 티켓 사진. 보여 줄 차례대로 온다. */
+    fun observeBookingPhotos(bookingId: Long): Flow<List<TripPhoto>> =
+        dao.observeByBooking(bookingId).map { list -> list.map { it.toPhoto() } }
+
+    /** 예약마다 사진이 몇 장 붙어 있는지. 일정표에서 티켓이 있는지 알려 주려고 쓴다. */
+    fun observeBookingPhotoCounts(tripId: Long): Flow<Map<Long, Int>> =
+        dao.observeBookingCounts(tripId).map { list -> list.associate { it.bookingId to it.count } }
+
     /**
      * 여행 기간에 찍은 기기 사진을 찾는다.
      *
@@ -99,12 +107,56 @@ class PhotoStore(
         photos
     }
 
+    /**
+     * 예약에 티켓 사진을 붙인다.
+     *
+     * 가족 여행이면 한 예약에 표가 여러 장이다. 그래서 여러 장을 받되 [MAX_BOOKING_PHOTOS]장까지만
+     * 둔다. 그보다 많이 쌓이면 개표대 앞에서 찾는 데 오히려 시간이 걸린다.
+     *
+     * @return 실제로 붙인 장수.
+     */
+    suspend fun attachToBooking(tripId: Long, bookingId: Long, sources: List<Uri>): Int {
+        if (bookingId <= 0L || sources.isEmpty()) return 0
+        val already = dao.countForBooking(bookingId)
+        val room = (MAX_BOOKING_PHOTOS - already).coerceAtLeast(0)
+        var order = already
+
+        var added = 0
+        sources.take(room).forEach { source ->
+            val photo = attach(tripId, expenseId = null, source = source, bookingId = bookingId, sortOrder = order)
+            if (photo != null) {
+                order++
+                added++
+            }
+        }
+        return added
+    }
+
+    /** 보여 줄 차례를 한 칸 옮긴다. */
+    suspend fun moveBookingPhoto(bookingId: Long, photoId: Long, up: Boolean) {
+        val photos = dao.findByBooking(bookingId)
+        val index = photos.indexOfFirst { it.id == photoId }
+        if (index < 0) return
+        val swapWith = if (up) index - 1 else index + 1
+        if (swapWith !in photos.indices) return
+
+        // 예전 사진은 차례가 모두 0이라 자리를 바꿔도 티가 안 난다. 한 번에 다시 매긴다.
+        val reordered = photos.toMutableList()
+        reordered[index] = photos[swapWith]
+        reordered[swapWith] = photos[index]
+        reordered.forEachIndexed { order, photo ->
+            if (photo.sortOrder != order) dao.update(photo.copy(sortOrder = order))
+        }
+    }
+
     /** 고른 사진을 앱 저장소로 복사해 여행에 붙인다. */
     suspend fun attach(
         tripId: Long,
         expenseId: Long?,
         source: Uri,
         note: String = "",
+        bookingId: Long? = null,
+        sortOrder: Int = 0,
     ): TripPhoto? = withContext(Dispatchers.IO) {
         val directory = File(context.filesDir, "photos/$tripId").apply { mkdirs() }
         val target = File(directory, "${System.currentTimeMillis()}-${source.lastPathSegment?.takeLast(16) ?: "photo"}.jpg")
@@ -120,9 +172,11 @@ class PhotoStore(
             TripPhotoEntity(
                 tripId = tripId,
                 expenseId = expenseId,
+                bookingId = bookingId,
                 filePath = target.absolutePath,
                 takenAt = System.currentTimeMillis(),
                 note = note,
+                sortOrder = sortOrder,
             ),
         )
         TripPhoto(id = id, uri = Uri.fromFile(target), takenAt = target.lastModified(), saved = true)
@@ -131,6 +185,11 @@ class PhotoStore(
     suspend fun remove(photoId: Long) = withContext(Dispatchers.IO) {
         dao.findById(photoId)?.let { File(it.filePath).delete() }
         dao.deleteById(photoId)
+    }
+
+    companion object {
+        /** 한 예약에 둘 수 있는 티켓 사진 수. */
+        const val MAX_BOOKING_PHOTOS = 20
     }
 
     private fun TripPhotoEntity.toPhoto() = TripPhoto(

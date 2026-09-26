@@ -26,7 +26,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CashTopUpEntity::class,
         DocumentEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -401,6 +401,20 @@ abstract class VolpDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 예약 티켓 사진. 예전 사진은 어느 예약 것도 아니다.
+                db.execSQL("ALTER TABLE `trip_photos` ADD COLUMN `bookingId` INTEGER DEFAULT NULL")
+                db.execSQL(
+                    "ALTER TABLE `trip_photos` ADD COLUMN `sortOrder` INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_trip_photos_bookingId` " +
+                        "ON `trip_photos` (`bookingId`)",
+                )
+            }
+        }
+
         @Volatile
         private var instance: VolpDatabase? = null
 
@@ -425,6 +439,7 @@ abstract class VolpDatabase : RoomDatabase() {
                     MIGRATION_11_12,
                     MIGRATION_12_13,
                     MIGRATION_13_14,
+                    MIGRATION_14_15,
                 )
                 .build()
     }

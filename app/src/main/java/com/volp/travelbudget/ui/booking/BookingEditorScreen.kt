@@ -2,7 +2,14 @@
 
 package com.volp.travelbudget.ui.booking
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -11,11 +18,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,6 +36,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -31,9 +45,16 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.volp.travelbudget.domain.booking.BookingType
@@ -63,6 +84,7 @@ fun BookingEditorScreen(
                 bookingRepository = app.bookingRepository,
                 tripRepository = app.repository,
                 placeLookup = app.placeLookup,
+                photoStore = app.photoStore,
                 tripId = tripId,
                 bookingId = bookingId,
                 defaultDate = defaultDate,
@@ -71,6 +93,17 @@ fun BookingEditorScreen(
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val photos by viewModel.photos.collectAsStateWithLifecycle()
+    val queuedPhotos by viewModel.queuedPhotos.collectAsStateWithLifecycle()
+    // 크게 볼 사진. 개표대 앞에서는 이 화면을 그대로 보여 주면 된다.
+    var viewing by remember { mutableStateOf<Any?>(null) }
+
+    val total = photos.size + queuedPhotos.size
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(
+            (viewModel.photoLimit - total).coerceAtLeast(1),
+        ),
+    ) { uris -> viewModel.addPhotos(uris) }
 
     LaunchedEffect(state.saved) {
         if (state.saved) onDone()
@@ -265,6 +298,74 @@ fun BookingEditorScreen(
                 }
             }
 
+            SectionCard("예약 티켓 사진") {
+                Text(
+                    "표나 바우처를 찍어 두면 개표대 앞에서 바로 꺼낼 수 있다. " +
+                        "한 예약에 ${viewModel.photoLimit}장까지 넣는다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                if (total > 0) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        photos.forEachIndexed { index, photo ->
+                            TicketThumbnail(
+                                model = photo.uri,
+                                position = index + 1,
+                                canMoveLeft = index > 0,
+                                canMoveRight = index < photos.lastIndex,
+                                onOpen = { viewing = photo.uri },
+                                onMove = { up -> viewModel.movePhoto(photo.id, up) },
+                                onRemove = { viewModel.removePhoto(photo.id) },
+                            )
+                        }
+                        queuedPhotos.forEachIndexed { index, uri ->
+                            TicketThumbnail(
+                                model = uri,
+                                position = photos.size + index + 1,
+                                canMoveLeft = index > 0,
+                                canMoveRight = index < queuedPhotos.lastIndex,
+                                onOpen = { viewing = uri },
+                                onMove = { up -> viewModel.moveQueuedPhoto(uri, up) },
+                                onRemove = { viewModel.removeQueuedPhoto(uri) },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "$total / ${viewModel.photoLimit}장 · 화살표로 차례를 바꾸고, 누르면 크게 본다.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        picker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    enabled = total < viewModel.photoLimit,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (total < viewModel.photoLimit) "티켓 사진 넣기" else "${viewModel.photoLimit}장을 채웠다")
+                }
+
+                if (!state.isEditing && queuedPhotos.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "예약을 저장할 때 함께 붙는다.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             SectionCard("메모") {
                 OutlinedTextField(
                     value = state.memo,
@@ -282,6 +383,87 @@ fun BookingEditorScreen(
                 Text(if (state.isEditing) "수정 저장" else "넣기")
             }
             Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    viewing?.let { model ->
+        TicketViewer(model = model, onDismiss = { viewing = null })
+    }
+}
+
+/**
+ * 티켓 사진 한 장.
+ *
+ * 몇 번째인지 숫자로 보인다. 가족 표가 여러 장이면 누구 것인지 차례로 기억하기 때문이다.
+ */
+@Composable
+private fun TicketThumbnail(
+    model: Any,
+    position: Int,
+    canMoveLeft: Boolean,
+    canMoveRight: Boolean,
+    onOpen: () -> Unit,
+    onMove: (Boolean) -> Unit,
+    onRemove: () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier
+                .size(110.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onOpen),
+        ) {
+            AsyncImage(
+                model = model,
+                contentDescription = "티켓 ${position}번",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(110.dp),
+            )
+            Text(
+                position.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp),
+            )
+            IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd)) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "사진 빼기",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
+        }
+        Row {
+            IconButton(onClick = { onMove(true) }, enabled = canMoveLeft) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "앞으로")
+            }
+            IconButton(onClick = { onMove(false) }, enabled = canMoveRight) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "뒤로")
+            }
+        }
+    }
+}
+
+/** 표를 크게 보여 준다. 개표대 앞에서는 이 화면을 그대로 내민다. */
+@Composable
+private fun TicketViewer(model: Any, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = model,
+                contentDescription = "티켓",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+            )
         }
     }
 }

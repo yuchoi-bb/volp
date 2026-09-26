@@ -1,5 +1,6 @@
 package com.volp.travelbudget.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -21,14 +22,18 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("tripId"), Index("expenseId")],
+    indices = [Index("tripId"), Index("expenseId"), Index("bookingId")],
 )
 data class TripPhotoEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val tripId: Long,
     /** 영수증 사진이면 어떤 지출의 것인지. 여행 사진이면 null. */
     val expenseId: Long?,
+    /** 예약 티켓 사진이면 어떤 예약의 것인지. 아니면 null. */
+    @ColumnInfo(defaultValue = "NULL") val bookingId: Long? = null,
     val filePath: String,
     val takenAt: Long,
     val note: String,
+    /** 한 예약 안에서 보여 줄 차례. 사람이 바꿀 수 있다. */
+    @ColumnInfo(defaultValue = "0") val sortOrder: Int = 0,
 )
