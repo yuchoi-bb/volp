@@ -29,10 +29,14 @@ object CardMessageParser {
                 CardIssuer.SAMSUNG -> SamsungCardRules.parse(lines, flat, text, receivedAt)
                 CardIssuer.SHINHAN -> ShinhanCardRules.parse(lines, flat, text, receivedAt)
                 CardIssuer.HANA -> HanaCardRules.parse(lines, text, receivedAt)
+                // 전용 규칙이 없는 카드사다. 아래 일반 규칙이 받는다.
+                else -> null
             }
             if (parsed != null) return parsed
         }
-        return null
+
+        // 전용 규칙에 걸리지 않은 것은 카드사가 다르거나 서식이 바뀐 것이다. 뼈대만 보고 읽는다.
+        return GenericCardRules.parse(lines, flat, text, receivedAt)
     }
 }
 

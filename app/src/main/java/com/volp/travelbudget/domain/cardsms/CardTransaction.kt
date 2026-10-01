@@ -7,6 +7,23 @@ enum class CardIssuer(val label: String, val senderNumbers: Set<String>) {
     SAMSUNG("삼성카드", setOf("15888900", "0220008100")),
     SHINHAN("신한카드", setOf("15447000", "15447200")),
     HANA("하나카드", setOf("18001111")),
+
+    // 아래는 전용 규칙 없이 일반 규칙으로 읽는 카드사다. 발신번호를 적지 않는 것은 일부러다 —
+    // 번호를 잘못 적으면 그 카드사 규칙만 시도하다 못 읽고 끝난다. 번호를 모르면 전부 시도한다.
+    KOOKMIN("국민카드", emptySet()),
+    HYUNDAI("현대카드", emptySet()),
+    LOTTE("롯데카드", emptySet()),
+    WOORI("우리카드", emptySet()),
+    BC("BC카드", emptySet()),
+    NONGHYUP("NH농협카드", emptySet()),
+    KAKAO("카카오뱅크", emptySet()),
+    TOSS("토스뱅크", emptySet()),
+    IBK("기업은행", emptySet()),
+    CITI("씨티카드", emptySet()),
+    SUHYUP("수협카드", emptySet()),
+
+    /** 이름을 알아보지 못한 카드. 그래도 금액과 가맹점은 읽는다. */
+    OTHER("카드", emptySet()),
     ;
 
     companion object {
